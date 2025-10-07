@@ -1,0 +1,40 @@
+name: Deploy PolygonHandCannon Demo to GitHub Pages
+
+# Trigger workflow on pushes to main branch
+on:
+  push:
+    branches:
+      - main  # change to 'master' if your default branch is master
+  workflow_dispatch:   # allows manual trigger in Actions tab
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ Checkout the repository
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      # 2️⃣ Set up Node.js v20
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 20
+
+      # 3️⃣ Install dependencies
+      - name: Install dependencies
+        run: npm install
+
+      # 4️⃣ Build Vite project
+      - name: Build project
+        run: npm run build
+
+      # 5️⃣ Deploy to GitHub Pages
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist
+          # optional: keep history
+          keep_files: false
