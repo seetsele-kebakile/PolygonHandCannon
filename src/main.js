@@ -1,9 +1,11 @@
+// src/main.js
+
 // Main application entry point
 import { WebGPURenderer } from './renderer/webgpu-renderer.js';
 import { GameState } from './game/game-state.js';
 import { ShapeSpawner } from './game/shape-spawner.js';
 import { HandTracker } from './input/hand-tracker.js';
-import { VoiceRecognition } from './input/voice-recognition.js';
+// The VoiceRecognition import has been removed
 import { ParticleSystem } from './effects/particle-system.js';
 
 class PolygonHandCannon {
@@ -13,7 +15,7 @@ class PolygonHandCannon {
     this.gameState = null;
     this.shapeSpawner = null;
     this.handTracker = null;
-    this.voiceRecognition = null;
+    // voiceRecognition property has been removed
     this.particleSystem = null;
     this.isInitialized = false;
     this.lastTime = performance.now();
@@ -24,24 +26,20 @@ class PolygonHandCannon {
     this.startButton = document.getElementById('startBtn');
     this.isHoveringStartButton = false;
     this.isHoveringRestartButton = false;
+    this.canShoot = true; 
+    this.canActivateMenu = true; // New cooldown for menu actions
   }
 
   async init() {
     try {
-      // Initialize hand tracking FIRST
+      // Initialize hand tracking
       this.showStatus('Initializing hand tracking...');
       this.handTracker = new HandTracker();
       await this.handTracker.init();
-      await this.handTracker.start(); // Start immediately
-      
-      // Start tracking loop for menu navigation
-      this.startMenuTracking();
+      await this.handTracker.start();
 
-      // Initialize voice recognition
-      this.showStatus('Initializing voice recognition...');
-      this.voiceRecognition = new VoiceRecognition();
-      await this.voiceRecognition.init();
-      await this.voiceRecognition.start(); // Start immediately
+      // Start tracking loop for menu and game
+      this.masterTrackingLoop();
 
       // Initialize WebGPU
       this.showStatus('Initializing WebGPU...');
@@ -56,23 +54,42 @@ class PolygonHandCannon {
       this.isInitialized = true;
       this.currentGameState = 'ready';
       
-      // Hide status, show ready message
       document.getElementById('status').classList.add('hidden');
-      this.showStatus('Ready! Aim at START and say "BANG"');
+      this.showStatus('Ready! Aim and make a shooting gesture to START');
 
     } catch (error) {
       console.error('Initialization error:', error);
       this.showStatus(`Error: ${error.message}`);
     }
   }
-
-  startMenuTracking() {
-    // Track hand position for menu interaction (both start screen and game over)
-    const trackMenu = () => {
-      // Always track, but only interact with buttons in menu states
+  
+  // Renamed from startMenuTracking to reflect it's always running
+  masterTrackingLoop() {
+    const loop = () => {
       const handPos = this.handTracker.getPointerPosition();
       const handDetected = this.handTracker.isHandDetected();
+      const isShooting = this.handTracker.getIsShooting();
 
+      // Update UI elements based on hand tracking
+      this.updateHandUI(handPos, handDetected);
+
+      // Handle menu interactions
+      if (this.currentGameState === 'ready' || this.currentGameState === 'gameOver') {
+        this.handleMenuInput(handPos, isShooting);
+      }
+      
+      // Reset menu cooldown when gesture is released
+      if (!isShooting) {
+          this.canActivateMenu = true;
+      }
+
+      requestAnimationFrame(loop);
+    };
+
+    loop();
+  }
+  
+  updateHandUI(handPos, handDetected) {
       // Always update hand status indicator
       const handStatus = document.getElementById('handStatus');
       if (handStatus) {
@@ -93,167 +110,72 @@ class PolygonHandCannon {
         this.crosshair.style.top = `${handPos.y}px`;
         this.handIndicator.style.left = `${handPos.x}px`;
         this.handIndicator.style.top = `${handPos.y}px`;
-        
-        // Show hand indicator on menus, hide during gameplay
-        if (this.currentGameState === 'ready' || this.currentGameState === 'gameOver') {
-          this.handIndicator.style.opacity = '0.8';
-        } else {
-          this.handIndicator.style.opacity = '0.6';
-        }
+        this.handIndicator.style.opacity = '0.8';
+      } else {
+        this.handIndicator.style.opacity = '0';
+      }
+  }
 
-        // Check if hovering over start button (ready state)
-        if (this.currentGameState === 'ready' && this.startButton) {
+  handleMenuInput(handPos, isShooting) {
+      if (!handPos) return;
+
+      // Check for start button interaction
+      if (this.currentGameState === 'ready') {
           const rect = this.startButton.getBoundingClientRect();
-          const hovering = (
-            handPos.x >= rect.left &&
-            handPos.x <= rect.right &&
-            handPos.y >= rect.top &&
-            handPos.y <= rect.bottom
+          this.isHoveringStartButton = (
+            handPos.x >= rect.left && handPos.x <= rect.right &&
+            handPos.y >= rect.top && handPos.y <= rect.bottom
           );
 
-          this.isHoveringStartButton = hovering;
-
-          if (hovering) {
+          if (this.isHoveringStartButton) {
             this.crosshair.classList.add('targeting');
             this.startButton.classList.add('targeted');
+            // Check for gesture to start game
+            if (isShooting && this.canActivateMenu) {
+                this.startGame();
+                this.canActivateMenu = false; // Prevent re-trigger
+            }
           } else {
             this.crosshair.classList.remove('targeting');
             this.startButton.classList.remove('targeted');
           }
-        } else {
-          // Clean up when not in ready state
-          this.isHoveringStartButton = false;
-          if (this.startButton) {
-            this.startButton.classList.remove('targeted');
-          }
-        }
-
-        // Check if hovering over restart button (game over state)
-        if (this.currentGameState === 'gameOver') {
-          const restartButton = document.getElementById('restartBtn');
-          if (restartButton) {
-            const rect = restartButton.getBoundingClientRect();
-            const hovering = (
-              handPos.x >= rect.left &&
-              handPos.x <= rect.right &&
-              handPos.y >= rect.top &&
-              handPos.y <= rect.bottom
-            );
-
-            this.isHoveringRestartButton = hovering;
-
-            if (hovering) {
-              this.crosshair.classList.add('targeting');
-              restartButton.classList.add('targeted');
-            } else {
-              this.crosshair.classList.remove('targeting');
-              restartButton.classList.remove('targeted');
-            }
-          }
-        } else {
-          // Clean up when not in game over state
-          this.isHoveringRestartButton = false;
-        }
-      } else {
-        this.handIndicator.style.opacity = '0';
       }
 
-      // Keep tracking running forever
-      requestAnimationFrame(trackMenu);
-    };
+      // Check for restart button interaction
+      if (this.currentGameState === 'gameOver') {
+          const restartButton = document.getElementById('restartBtn');
+          const rect = restartButton.getBoundingClientRect();
+          this.isHoveringRestartButton = (
+            handPos.x >= rect.left && handPos.x <= rect.right &&
+            handPos.y >= rect.top && handPos.y <= rect.bottom
+          );
 
-    trackMenu();
+          if (this.isHoveringRestartButton) {
+            this.crosshair.classList.add('targeting');
+            restartButton.classList.add('targeted');
+            // Check for gesture to restart game
+            if (isShooting && this.canActivateMenu) {
+                this.restartGame();
+                this.canActivateMenu = false; // Prevent re-trigger
+            }
+          } else {
+            this.crosshair.classList.remove('targeting');
+            restartButton.classList.remove('targeted');
+          }
+      }
   }
 
   setupEventListeners() {
-    const startBtn = document.getElementById('startBtn');
-    const restartBtn = document.getElementById('restartBtn');
-
-    // Keep mouse click as backup
-    startBtn.addEventListener('click', () => this.startGame());
-    restartBtn.addEventListener('click', () => this.restartGame());
-
-    // Listen for voice commands
-    this.voiceRecognition.on('command', (word) => this.handleVoiceCommand(word));
+    // Mouse clicks are kept as a fallback input method
+    document.getElementById('startBtn').addEventListener('click', () => this.startGame());
+    document.getElementById('restartBtn').addEventListener('click', () => this.restartGame());
   }
 
-  handleVoiceCommand(word) {
-    const feedback = document.getElementById('voiceFeedback');
-    feedback.textContent = `"${word}"`;
-    feedback.classList.add('show');
-
-    setTimeout(() => {
-      feedback.classList.remove('show');
-    }, 1000);
-
-    // Handle "bang" command to start game
-    if (this.currentGameState === 'ready') {
-      if (word.toLowerCase().includes('bang') || 
-          word.toLowerCase().includes('fire') || 
-          word.toLowerCase().includes('shoot')) {
-        
-        if (this.isHoveringStartButton) {
-          feedback.classList.add('correct');
-          feedback.classList.remove('incorrect');
-          feedback.textContent = '"BANG!" - STARTING GAME';
-          
-          setTimeout(() => {
-            this.startGame();
-          }, 500);
-        } else {
-          feedback.classList.add('incorrect');
-          feedback.classList.remove('correct');
-          feedback.textContent = 'AIM AT START BUTTON!';
-        }
-        return;
-      }
-    }
-
-    // Handle "bang" command to restart game from game over
-    if (this.currentGameState === 'gameOver') {
-      if (word.toLowerCase().includes('bang') || 
-          word.toLowerCase().includes('fire') || 
-          word.toLowerCase().includes('shoot')) {
-        
-        if (this.isHoveringRestartButton) {
-          feedback.classList.add('correct');
-          feedback.classList.remove('incorrect');
-          feedback.textContent = '"BANG!" - RESTARTING';
-          
-          setTimeout(() => {
-            this.restartGame();
-          }, 500);
-        } else {
-          feedback.classList.add('incorrect');
-          feedback.classList.remove('correct');
-          feedback.textContent = 'AIM AT PLAY AGAIN BUTTON!';
-        }
-        return;
-      }
-    }
-
-    // Handle game commands during gameplay
-    if (this.currentGameState === 'playing') {
-      if (!this.targetedShape) {
-        feedback.classList.add('incorrect');
-        feedback.classList.remove('correct');
-        return;
-      }
-
-      if (word.toLowerCase() === this.targetedShape.type.toLowerCase()) {
-        feedback.classList.add('correct');
-        feedback.classList.remove('incorrect');
-
-        this.destroyShape(this.targetedShape);
-        this.gameState.addScore(100);
-      } else {
-        feedback.classList.add('incorrect');
-        feedback.classList.remove('correct');
-      }
-    }
-  }
+  // The entire handleVoiceCommand function has been removed
 
   async startGame() {
+    if (this.currentGameState !== 'ready') return; // Prevent starting multiple times
+
     document.getElementById('startScreen').classList.add('hidden');
     document.getElementById('status').classList.add('hidden');
 
@@ -261,9 +183,7 @@ class PolygonHandCannon {
     this.gameState.reset();
     this.shapeSpawner.reset();
     this.particleSystem.reset();
-
-    // Keep hand tracking running during gameplay
-    // Don't stop it!
+    this.canShoot = true;
 
     this.gameLoop();
   }
@@ -271,49 +191,49 @@ class PolygonHandCannon {
   restartGame() {
     document.getElementById('gameOver').classList.remove('show');
     this.currentGameState = 'ready';
-    
-    // Menu tracking is already running continuously
-    // Just show the start screen again
     document.getElementById('startScreen').classList.remove('hidden');
   }
 
   gameLoop() {
-    if (!this.isInitialized || this.gameState.isGameOver) return;
+    if (this.gameState.isGameOver) return;
 
     const currentTime = performance.now();
     const deltaTime = (currentTime - this.lastTime) / 1000;
     this.lastTime = currentTime;
 
-    // Get hand position (tracking is always running in background)
     const handPos = this.handTracker.getPointerPosition();
+    const isShooting = this.handTracker.getIsShooting();
 
-    // Spawn new shapes
     this.shapeSpawner.update(deltaTime, this.gameState.wave);
 
-    // Update all active shapes
     const shapes = this.shapeSpawner.getShapes();
     shapes.forEach(shape => {
       shape.position[2] += shape.velocity * deltaTime;
-
       if (shape.position[2] > 2) {
         this.gameOver();
       }
     });
 
-    // Perform raycasting to find targeted shape
     this.targetedShape = this.performRaycast(handPos);
 
-    // Update crosshair appearance for gameplay
+    if (isShooting && this.canShoot && this.targetedShape) {
+      this.destroyShape(this.targetedShape);
+      this.gameState.addScore(100);
+      this.canShoot = false;
+    }
+
+    if (!isShooting) {
+      this.canShoot = true;
+    }
+
     if (this.targetedShape) {
       this.crosshair.classList.add('targeting');
     } else {
       this.crosshair.classList.remove('targeting');
     }
 
-    // Update particle effects
     this.particleSystem.update(deltaTime);
 
-    // Render scene
     this.renderer.render({
       shapes: this.shapeSpawner.getShapes(),
       particles: this.particleSystem.getParticles(),
@@ -321,7 +241,6 @@ class PolygonHandCannon {
       deltaTime
     });
 
-    // Update HUD
     this.updateHUD();
 
     requestAnimationFrame(() => this.gameLoop());
@@ -363,19 +282,15 @@ class PolygonHandCannon {
   updateHUD() {
     document.getElementById('score').textContent = this.gameState.score;
     document.getElementById('wave').textContent = this.gameState.wave;
-    document.getElementById('shapeCount').textContent = 
+    document.getElementById('shapeCount').textContent =
       this.shapeSpawner.getShapes().length;
   }
 
   gameOver() {
     this.gameState.isGameOver = true;
     this.currentGameState = 'gameOver';
-
     document.getElementById('finalScore').textContent = this.gameState.score;
     document.getElementById('gameOver').classList.add('show');
-
-    // Menu tracking is already running - just change state
-    // The tracking loop will automatically detect the gameOver state
   }
 
   showStatus(message) {
