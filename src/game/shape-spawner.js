@@ -24,15 +24,16 @@ export class ShapeSpawner {
       this.spawnRandomShape(wave);
     }
     
-    // FIX: Clean up destroyed shapes here instead of in main.js
-    this.shapes = this.shapes.filter(shape => {
-      if (shape.toBeRemoved) {
+    // FIX: ONLY filter out destroyed shapes, don't modify active shapes
+    // Process removals at the end to avoid mid-iteration issues
+    for (let i = this.shapes.length - 1; i >= 0; i--) {
+      if (this.shapes[i].toBeRemoved) {
+        const shape = this.shapes[i];
         shape.vertexBuffer?.destroy();
         shape.indexBuffer?.destroy();
-        return false;
+        this.shapes.splice(i, 1);
       }
-      return true;
-    });
+    }
   }
 
   spawnRandomShape(wave) {

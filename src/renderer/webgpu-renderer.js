@@ -96,7 +96,10 @@ export class WebGPURenderer {
 
     renderPass.setPipeline(this.shapePipeline);
     renderPass.setBindGroup(0, this.shapeBindGroup);
-    shapes.forEach(shape => this.renderShape(renderPass, shape, shape === targetedShape));
+    
+    // FIX: Filter shapes before rendering to ensure we only draw valid shapes
+    const validShapes = shapes.filter(s => s && s.vertexBuffer && s.indexBuffer && !s.toBeRemoved);
+    validShapes.forEach(shape => this.renderShape(renderPass, shape, shape === targetedShape));
 
     if (particles && particles.length > 0) {
       renderPass.setPipeline(this.particlePipeline);
@@ -108,6 +111,11 @@ export class WebGPURenderer {
   }
 
   renderShape(renderPass, shape, isTargeted) {
+    // Validate shape has required buffers
+    if (!shape.vertexBuffer || !shape.indexBuffer || !shape.indexCount) {
+      return; // Skip invalid shapes
+    }
+
     const shapeData = new Float32Array(24);
     const modelMatrix = mat4.create();
     mat4.translate(modelMatrix, modelMatrix, shape.position);
@@ -116,7 +124,8 @@ export class WebGPURenderer {
     
     shapeData.set(modelMatrix, 0);
     shapeData.set(shape.color, 16);
-    shapeData[20] = Math.max(0, Math.min(1, (10 - Math.abs(shape.position[2])) / 8));
+    // Threat: shapes approach from z=-15 to z=1, calculate threat based on proximity
+    shapeData[20] = Math.max(0, Math.min(1, shape.threat !== undefined ? shape.threat : 0));
     shapeData[21] = isTargeted ? 1.0 : 0.0;
     
     this.device.queue.writeBuffer(this.shapeUniformBuffer, 0, shapeData);
@@ -138,19 +147,23 @@ export class WebGPURenderer {
   }
   
   projectToScreen(worldPos) {
-    // FIX: Corrected projection math - was not handling perspective division properly
+    // FIX: Corrected projection math - handle shapes near/past camera
     const vpMatrix = mat4.multiply(mat4.create(), this.projectionMatrix, this.viewMatrix);
     const clipPos = vec3.transformMat4(vec3.create(), worldPos, vpMatrix);
     
-    // Skip if behind camera
-    if (clipPos[2] < 0) return null;
+    // Skip if behind camera (negative z in clip space means behind)
+    // But allow very close shapes to still be targetable
+    if (clipPos[2] < -0.5) return null;
+    
+    // Avoid division by zero for shapes exactly at camera
+    if (Math.abs(clipPos[2]) < 0.01) return null;
     
     // Perspective division for NDC
     const ndcX = clipPos[0] / clipPos[2];
     const ndcY = clipPos[1] / clipPos[2];
     
-    // Check if in viewport
-    if (ndcX < -1 || ndcX > 1 || ndcY < -1 || ndcY > 1) return null;
+    // Check if in viewport (allow some margin for near shapes)
+    if (ndcX < -2 || ndcX > 2 || ndcY < -2 || ndcY > 2) return null;
     
     // Convert to screen space
     return { 

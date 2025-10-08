@@ -184,4 +184,4 @@ class PolygonHandCannon {
   }
 }
 
-new PolygonHandCannon().init()
+new PolygonHandCannon().init();
