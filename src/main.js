@@ -6,7 +6,7 @@ import { HandTracker } from './input/hand-tracker.js';
 import { VoiceRecognition } from './input/voice-recognition.js';
 import { ParticleSystem } from './effects/particle-system.js';
 
-class CognitiveCannonGame {
+class PolygonHandCannon {
   constructor() {
     this.canvas = document.getElementById('gpuCanvas');
     this.renderer = null;
@@ -340,5 +340,5 @@ class CognitiveCannonGame {
   }
 }
 
-const game = new CognitiveCannonGame();
+const game = new PolygonHandCannon();
 game.init();
