@@ -45,9 +45,9 @@ export class WebGPURenderer {
     this.createPipelines();
 
     mat4.identity(this.viewMatrix);
-    mat4.lookAt(this.viewMatrix, 
-      vec3.fromValues(0, 0, 0), 
-      vec3.fromValues(0, 0, -1), 
+    mat4.lookAt(this.viewMatrix,
+      vec3.fromValues(0, 0, 0),
+      vec3.fromValues(0, 0, -1),
       vec3.fromValues(0, 1, 0)
     );
 
@@ -69,7 +69,7 @@ export class WebGPURenderer {
     });
 
     this.shapeUniformBuffer = this.device.createBuffer({
-      size: 64,
+      size: 80, // Corrected size
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     });
   }
@@ -231,17 +231,17 @@ export class WebGPURenderer {
     const threat = Math.max(0, Math.min(1, (10 - distance) / 8));
     const time = performance.now() / 1000;
 
-    const shapeData = new Float32Array(16);
+    const shapeData = new Float32Array(20); // Corrected size
     const modelMatrix = mat4.create();
     mat4.translate(modelMatrix, modelMatrix, shape.position);
     mat4.rotateY(modelMatrix, modelMatrix, shape.rotation[1]);
     mat4.rotateX(modelMatrix, modelMatrix, shape.rotation[0]);
     
     shapeData.set(modelMatrix, 0);
-    shapeData[12] = threat;
-    shapeData[13] = isTargeted ? 1.0 : 0.0;
-    shapeData[14] = time;
-    shapeData[15] = 0;
+    shapeData[16] = threat; // Corrected offset
+    shapeData[17] = isTargeted ? 1.0 : 0.0; // Corrected offset
+    shapeData[18] = time; // Corrected offset
+    shapeData[19] = 0; // Padding
 
     this.device.queue.writeBuffer(this.shapeUniformBuffer, 0, shapeData);
 
