@@ -208,11 +208,11 @@
     }
 
     .start-btn.targeted::before {
-      content: '🎯 ';
+      content: '識 ';
     }
 
     .start-btn.targeted::after {
-      content: ' - SAY "BANG"!';
+      content: ' - SHOOT!';
       font-size: 16px;
       display: block;
       margin-top: 5px;
@@ -283,44 +283,17 @@
     }
 
     .restart-btn.targeted::before {
-      content: '🎯 ';
+      content: '識 ';
     }
 
     .restart-btn.targeted::after {
-      content: ' - SAY "BANG"!';
+      content: ' - SHOOT!';
       font-size: 14px;
       display: block;
       margin-top: 5px;
     }
 
-    .voice-feedback {
-      position: absolute;
-      bottom: 30px;
-      left: 50%;
-      transform: translateX(-50%);
-      padding: 15px 30px;
-      background: rgba(0, 0, 0, 0.8);
-      border: 2px solid #0f0;
-      border-radius: 10px;
-      font-size: 18px;
-      color: #0f0;
-      opacity: 0;
-      transition: opacity 0.3s;
-    }
-
-    .voice-feedback.show {
-      opacity: 1;
-    }
-
-    .voice-feedback.correct {
-      border-color: #0f0;
-      color: #0f0;
-    }
-
-    .voice-feedback.incorrect {
-      border-color: #f00;
-      color: #f00;
-    }
+    /* The voice-feedback class has been removed */
 
     .hand-status {
       position: absolute;
@@ -348,7 +321,7 @@
       display: none;
     }
   </style>
-  <script type="module" crossorigin src="/PolygonHandCannon/assets/index-CG0SUdha.js"></script>
+  <script type="module" crossorigin src="/PolygonHandCannon/assets/index-Xu4jt2MX.js"></script>
 </head>
 <body>
   <canvas id="gpuCanvas"></canvas>
@@ -369,24 +342,24 @@
 
     <div class="start-screen" id="startScreen">
       <h1>Polygon Hand Cannon</h1>
-      <h3 style="color: #0f0; margin-bottom: 15px;">Hand Tracking Edition</h3>
-      <p>A first-person rail shooter controlled by hand gestures and voice!</p>
+      <h3 style="color: #0f0; margin-bottom: 15px;">Gesture Control Edition</h3>
+      <p>A first-person rail shooter controlled entirely by hand gestures!</p>
       <ul>
         <li><strong>AIM:</strong> Point your index finger to aim the crosshair</li>
-        <li><strong>START:</strong> Aim at the button below and say <strong>"BANG"</strong></li>
-        <li><strong>FIRE:</strong> During gameplay, say the shape name (cube, sphere, torus, pyramid)</li>
+        <li><strong>FIRE:</strong> Make a "finger gun" gesture to shoot shapes</li>
+        <li><strong>START/SELECT:</strong> Aim at a button and make the shooting gesture</li>
         <li><strong>SURVIVE:</strong> Destroy shapes before they reach you</li>
       </ul>
       
       <div class="instruction-highlight">
-        👉 Point at START button and say "BANG" to begin! 👈
+         👉 Point at the START button and make a shooting gesture to begin! 👈
       </div>
 
       <button class="start-btn" id="startBtn">START GAME</button>
 
       <p style="margin-top: 20px; font-size: 12px;">
-        Camera and microphone active<br>
-        Hold your hand in front of the camera and point with your index finger
+        Camera access is required<br>
+        Hold your hand in front of the camera to play.
       </p>
     </div>
 
@@ -395,13 +368,12 @@
       <div class="final-score">FINAL SCORE: <span id="finalScore">0</span></div>
       
       <div class="instruction-highlight">
-        👉 Point at PLAY AGAIN and say "BANG" to restart! 👈
+         👉 Aim at PLAY AGAIN and make a shooting gesture to restart! 👈
       </div>
       
       <button class="restart-btn" id="restartBtn">PLAY AGAIN</button>
     </div>
 
-    <div class="voice-feedback" id="voiceFeedback"></div>
     <div class="hand-status detected" id="handStatus">HAND DETECTED</div>
   </div>
 
