@@ -1,3 +1,5 @@
+// src/shaders/shape-fragment.wgsl
+
 struct FragmentInput {
   @location(0) normal: vec3<f32>,
   @location(1) threat: f32,
@@ -11,10 +13,12 @@ fn main(input: FragmentInput) -> @location(0) vec4<f32> {
   let diffuse = max(dot(N, lightDir), 0.0) * 0.7 + 0.3;
   
   var color: vec3<f32>;
+  
+  // Use saturate() to clamp the mix value between 0.0 and 1.0
   if (input.threat < 0.5) {
-    color = mix(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 1.0, 0.0), input.threat * 2.0);
+    color = mix(vec3<f32>(0.0, 1.0, 0.0), vec3<f32>(1.0, 1.0, 0.0), saturate(input.threat * 2.0));
   } else {
-    color = mix(vec3<f32>(1.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), (input.threat - 0.5) * 2.0);
+    color = mix(vec3<f32>(1.0, 1.0, 0.0), vec3<f32>(1.0, 0.0, 0.0), saturate((input.threat - 0.5) * 2.0));
   }
   
   if (input.threat > 0.8) {

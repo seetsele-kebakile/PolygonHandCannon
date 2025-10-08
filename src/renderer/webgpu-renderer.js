@@ -1,3 +1,5 @@
+// src/renderer/webgpu-renderer.js
+
 // WebGPU rendering engine
 import { mat4, vec3 } from 'gl-matrix';
 import shapeVertexShader from '../shaders/shape-vertex.wgsl?raw';
@@ -45,9 +47,9 @@ export class WebGPURenderer {
     this.createPipelines();
 
     mat4.identity(this.viewMatrix);
-    mat4.lookAt(this.viewMatrix,
-      vec3.fromValues(0, 0, 0),
-      vec3.fromValues(0, 0, -1),
+    mat4.lookAt(this.viewMatrix, 
+      vec3.fromValues(0, 0, 0), 
+      vec3.fromValues(0, 0, -1), 
       vec3.fromValues(0, 1, 0)
     );
 
@@ -69,7 +71,7 @@ export class WebGPURenderer {
     });
 
     this.shapeUniformBuffer = this.device.createBuffer({
-      size: 80, // Corrected size
+      size: 80,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST
     });
   }
@@ -140,7 +142,7 @@ export class WebGPURenderer {
         entryPoint: 'main',
         buffers: [
           {
-            arrayStride: 28,
+            arrayStride: 28, // Correctly defined for particle vertex data
             attributes: [
               { shaderLocation: 0, offset: 0, format: 'float32x3' },
               { shaderLocation: 1, offset: 12, format: 'float32x3' },
@@ -155,16 +157,8 @@ export class WebGPURenderer {
         targets: [{
           format: this.format,
           blend: {
-            color: {
-              srcFactor: 'src-alpha',
-              dstFactor: 'one',
-              operation: 'add'
-            },
-            alpha: {
-              srcFactor: 'one',
-              dstFactor: 'one',
-              operation: 'add'
-            }
+            color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' },
+            alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' }
           }
         }]
       },
@@ -210,7 +204,6 @@ export class WebGPURenderer {
 
     renderPass.setPipeline(this.shapePipeline);
     renderPass.setBindGroup(0, this.bindGroup);
-
     shapes.forEach(shape => {
       this.renderShape(renderPass, shape, shape === targetedShape);
     });
@@ -231,18 +224,17 @@ export class WebGPURenderer {
     const threat = Math.max(0, Math.min(1, (10 - distance) / 8));
     const time = performance.now() / 1000;
 
-    const shapeData = new Float32Array(20); // Corrected size
+    const shapeData = new Float32Array(20);
     const modelMatrix = mat4.create();
     mat4.translate(modelMatrix, modelMatrix, shape.position);
     mat4.rotateY(modelMatrix, modelMatrix, shape.rotation[1]);
     mat4.rotateX(modelMatrix, modelMatrix, shape.rotation[0]);
     
     shapeData.set(modelMatrix, 0);
-    shapeData[16] = threat; // Corrected offset
-    shapeData[17] = isTargeted ? 1.0 : 0.0; // Corrected offset
-    shapeData[18] = time; // Corrected offset
-    shapeData[19] = 0; // Padding
-
+    shapeData[16] = threat;
+    shapeData[17] = isTargeted ? 1.0 : 0.0;
+    shapeData[18] = time;
+    
     this.device.queue.writeBuffer(this.shapeUniformBuffer, 0, shapeData);
 
     renderPass.setVertexBuffer(0, shape.vertexBuffer);
@@ -251,14 +243,17 @@ export class WebGPURenderer {
   }
 
   renderParticle(renderPass, particle) {
-    const shapeData = new Float32Array(16);
+    const particleData = new Float32Array(20); // Uniform buffer still needs a size
     const modelMatrix = mat4.create();
     mat4.translate(modelMatrix, modelMatrix, particle.position);
     
-    shapeData.set(modelMatrix, 0);
-    shapeData.set(particle.color, 12);
-
-    this.device.queue.writeBuffer(this.shapeUniformBuffer, 0, shapeData);
+    particleData.set(modelMatrix, 0);
+    // --- THIS IS THE FIX ---
+    // We only send the model matrix and life to the uniform buffer.
+    // The particle's own color is in its vertex buffer and handled by the pipeline.
+    particleData[16] = particle.life; 
+    
+    this.device.queue.writeBuffer(this.shapeUniformBuffer, 0, particleData);
 
     renderPass.setVertexBuffer(0, particle.vertexBuffer);
     renderPass.draw(6);
@@ -283,6 +278,7 @@ export class WebGPURenderer {
   }
 
   handleResize() {
+    if (!this.device) return;
     this.canvas.width = window.innerWidth;
     this.canvas.height = window.innerHeight;
     

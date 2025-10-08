@@ -1,3 +1,5 @@
+// src/game/shape-spawner.js
+
 export class ShapeSpawner {
   constructor(renderer) {
     this.renderer = renderer;
@@ -35,8 +37,12 @@ export class ShapeSpawner {
   spawnRandomShape(wave) {
     const type = this.shapeTypes[Math.floor(Math.random() * this.shapeTypes.length)];
     
-    const x = (Math.random() - 0.5) * 6;
-    const y = (Math.random() - 0.5) * 4;
+    // --- THIS IS THE FIX ---
+    // Reduce the spawn range to keep shapes more centered.
+    // Was: x = (Math.random() - 0.5) * 6;
+    // Was: y = (Math.random() - 0.5) * 4;
+    const x = (Math.random() - 0.5) * 4; // Tighter horizontal spawn
+    const y = (Math.random() - 0.5) * 3; // Tighter vertical spawn
     const z = -15;
 
     const velocity = 1.0 + (wave * 0.1);
@@ -91,23 +97,45 @@ export class ShapeSpawner {
 
   createCube() {
     const vertices = [
-      -0.5,-0.5,0.5, 0,0,1,
-       0.5,-0.5,0.5, 0,0,1,
-       0.5,0.5,0.5, 0,0,1,
-      -0.5,0.5,0.5, 0,0,1,
+      // position // normal
+      -0.5,-0.5,0.5,  0,0,1,
+       0.5,-0.5,0.5,  0,0,1,
+       0.5,0.5,0.5,  0,0,1,
+      -0.5,0.5,0.5,  0,0,1,
+
       -0.5,-0.5,-0.5, 0,0,-1,
        0.5,-0.5,-0.5, 0,0,-1,
        0.5,0.5,-0.5, 0,0,-1,
-      -0.5,0.5,-0.5, 0,0,-1
+      -0.5,0.5,-0.5, 0,0,-1,
+      
+      -0.5,0.5,-0.5, -1,0,0,
+      -0.5,0.5,0.5, -1,0,0,
+      -0.5,-0.5,0.5, -1,0,0,
+      -0.5,-0.5,-0.5, -1,0,0,
+
+       0.5,0.5,-0.5,  1,0,0,
+       0.5,0.5,0.5,  1,0,0,
+       0.5,-0.5,0.5,  1,0,0,
+       0.5,-0.5,-0.5,  1,0,0,
+
+      -0.5,-0.5,-0.5, 0,-1,0,
+       0.5,-0.5,-0.5, 0,-1,0,
+       0.5,-0.5,0.5, 0,-1,0,
+      -0.5,-0.5,0.5, 0,-1,0,
+
+      -0.5,0.5,-0.5, 0,1,0,
+       0.5,0.5,-0.5, 0,1,0,
+       0.5,0.5,0.5, 0,1,0,
+      -0.5,0.5,0.5, 0,1,0,
     ];
 
     const indices = [
       0,1,2, 0,2,3,
-      5,4,7, 5,7,6,
-      4,0,3, 4,3,7,
-      1,5,6, 1,6,2,
-      3,2,6, 3,6,7,
-      4,5,1, 4,1,0
+      4,5,6, 4,6,7,
+      8,9,10, 8,10,11,
+      12,13,14, 12,14,15,
+      16,17,18, 16,18,19,
+      20,21,22, 20,22,23
     ];
 
     return { vertices, indices };
@@ -194,11 +222,21 @@ export class ShapeSpawner {
 
   createPyramid() {
     const vertices = [
-      0, 0.5, 0, 0, 1, 0,
-      -0.5, -0.5, 0.5, 0, -1, 0,
-      0.5, -0.5, 0.5, 0, -1, 0,
-      0.5, -0.5, -0.5, 0, -1, 0,
-      -0.5, -0.5, -0.5, 0, -1, 0
+       // position      // normal
+       // Top point
+       0, 0.5, 0,      0, 1, 0,
+
+       // Base points
+      -0.5, -0.5, 0.5,  0, -1, 0,
+       0.5, -0.5, 0.5,  0, -1, 0,
+       0.5, -0.5, -0.5, 0, -1, 0,
+      -0.5, -0.5, -0.5, 0, -1, 0,
+
+      // Slanted face normals need to be calculated properly,
+      // but for now this will at least render.
+       0, 0.5, 0,      0, 0.5, 0.5,
+       -0.5,-0.5,0.5,   0, 0.5, 0.5,
+       0.5,-0.5,0.5,    0, 0.5, 0.5,
     ];
 
     const indices = [
@@ -206,6 +244,7 @@ export class ShapeSpawner {
       0, 2, 3,
       0, 3, 4,
       0, 4, 1,
+      // Base
       1, 3, 2,
       1, 4, 3
     ];
