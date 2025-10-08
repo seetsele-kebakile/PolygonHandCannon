@@ -3,7 +3,7 @@ export class VoiceRecognition {
     this.recognition = null;
     this.isListening = false;
     this.listeners = new Map();
-    this.validCommands = ['cube', 'sphere', 'torus', 'pyramid'];
+    this.validCommands = ['cube', 'sphere', 'torus', 'pyramid', 'bang', 'fire', 'shoot'];
   }
 
   async init() {
@@ -22,8 +22,13 @@ export class VoiceRecognition {
       const last = event.results.length - 1;
       const word = event.results[last][0].transcript.trim().toLowerCase();
 
-      if (this.validCommands.includes(word)) {
-        this.emit('command', word);
+      console.log('Voice detected:', word);
+
+      // Check for any valid command words in the transcript
+      const detectedCommand = this.validCommands.find(cmd => word.includes(cmd));
+      
+      if (detectedCommand) {
+        this.emit('command', detectedCommand);
       }
     };
 
@@ -39,7 +44,11 @@ export class VoiceRecognition {
 
     this.recognition.onend = () => {
       if (this.isListening) {
-        this.recognition.start();
+        try {
+          this.recognition.start();
+        } catch (e) {
+          // Ignore errors from restarting
+        }
       }
     };
   }
@@ -50,6 +59,7 @@ export class VoiceRecognition {
     try {
       this.recognition.start();
       this.isListening = true;
+      console.log('Voice recognition started');
     } catch (error) {
       console.error('Failed to start speech recognition:', error);
     }

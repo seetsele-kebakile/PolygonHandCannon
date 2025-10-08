@@ -1,22 +1,9 @@
-<!doctype html>
-<html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>package.json</title>
-  </head>
-  <body>
-    <div id="app"></div>
-    <script type="module" src="/src/main.js"></script>
-  </body>
-</html>
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cognitive Cannon - Hand Tracking</title>
+  <title>Polygon Hand Cannon</title>
   <style>
     * {
       margin: 0;
@@ -170,6 +157,23 @@
       color: #ccc;
     }
 
+    .start-screen .instruction-highlight {
+      color: #ff0;
+      font-weight: bold;
+      font-size: 18px;
+      margin-top: 20px;
+      padding: 15px;
+      background: rgba(255, 255, 0, 0.1);
+      border: 2px solid rgba(255, 255, 0, 0.3);
+      border-radius: 8px;
+      animation: glow 2s ease-in-out infinite;
+    }
+
+    @keyframes glow {
+      0%, 100% { box-shadow: 0 0 5px rgba(255, 255, 0, 0.3); }
+      50% { box-shadow: 0 0 20px rgba(255, 255, 0, 0.6); }
+    }
+
     .start-btn {
       margin-top: 30px;
       padding: 15px 40px;
@@ -188,6 +192,30 @@
       background: #0c0;
       transform: scale(1.05);
       box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+    }
+
+    .start-btn.targeted {
+      background: #ff0;
+      color: #000;
+      transform: scale(1.15);
+      box-shadow: 0 0 30px rgba(255, 255, 0, 0.8);
+      animation: targetedButton 0.5s ease-in-out infinite;
+    }
+
+    @keyframes targetedButton {
+      0%, 100% { transform: scale(1.15); }
+      50% { transform: scale(1.2); }
+    }
+
+    .start-btn.targeted::before {
+      content: '🎯 ';
+    }
+
+    .start-btn.targeted::after {
+      content: ' - SAY "BANG"!';
+      font-size: 16px;
+      display: block;
+      margin-top: 5px;
     }
 
     .game-over {
@@ -318,14 +346,21 @@
       <p>A first-person rail shooter controlled by hand gestures and voice!</p>
       <ul>
         <li><strong>AIM:</strong> Point your index finger to aim the crosshair</li>
-        <li><strong>FIRE:</strong> Say the shape name (cube, sphere, torus, pyramid)</li>
+        <li><strong>START:</strong> Aim at the button below and say <strong>"BANG"</strong></li>
+        <li><strong>FIRE:</strong> During gameplay, say the shape name (cube, sphere, torus, pyramid)</li>
         <li><strong>SURVIVE:</strong> Destroy shapes before they reach you</li>
       </ul>
+      
+      <div class="instruction-highlight">
+        👉 Point at START button and say "BANG" to begin! 👈
+      </div>
+
+      <button class="start-btn" id="startBtn">START GAME</button>
+
       <p style="margin-top: 20px; font-size: 12px;">
-        Requires camera and microphone permissions<br>
+        Camera and microphone active<br>
         Hold your hand in front of the camera and point with your index finger
       </p>
-      <button class="start-btn" id="startBtn">START GAME</button>
     </div>
 
     <div class="game-over" id="gameOver">

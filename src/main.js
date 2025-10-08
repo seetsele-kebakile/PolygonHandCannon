@@ -6,7 +6,7 @@ import { HandTracker } from './input/hand-tracker.js';
 import { VoiceRecognition } from './input/voice-recognition.js';
 import { ParticleSystem } from './effects/particle-system.js';
 
-class PolygonHandCannon {
+class CognitiveCannonGame {
   constructor() {
     this.canvas = document.getElementById('gpuCanvas');
     this.renderer = null;
@@ -20,12 +20,30 @@ class PolygonHandCannon {
     this.crosshair = document.getElementById('crosshair');
     this.handIndicator = document.getElementById('handIndicator');
     this.targetedShape = null;
+    this.currentGameState = 'initializing'; // initializing, ready, playing, gameOver
+    this.startButton = document.getElementById('startBtn');
+    this.isHoveringStartButton = false;
   }
 
   async init() {
     try {
-      this.showStatus('Initializing WebGPU...');
+      // Initialize hand tracking FIRST
+      this.showStatus('Initializing hand tracking...');
+      this.handTracker = new HandTracker();
+      await this.handTracker.init();
+      await this.handTracker.start(); // Start immediately
+      
+      // Start tracking loop for menu navigation
+      this.startMenuTracking();
 
+      // Initialize voice recognition
+      this.showStatus('Initializing voice recognition...');
+      this.voiceRecognition = new VoiceRecognition();
+      await this.voiceRecognition.init();
+      await this.voiceRecognition.start(); // Start immediately
+
+      // Initialize WebGPU
+      this.showStatus('Initializing WebGPU...');
       this.renderer = new WebGPURenderer(this.canvas);
       await this.renderer.init();
 
@@ -33,17 +51,13 @@ class PolygonHandCannon {
       this.shapeSpawner = new ShapeSpawner(this.renderer);
       this.particleSystem = new ParticleSystem(this.renderer);
 
-      this.showStatus('Initializing hand tracking...');
-      this.handTracker = new HandTracker();
-      await this.handTracker.init();
-
-      this.showStatus('Initializing voice recognition...');
-      this.voiceRecognition = new VoiceRecognition();
-      await this.voiceRecognition.init();
-
       this.setupEventListeners();
       this.isInitialized = true;
-      this.showStatus('Ready! Click START GAME');
+      this.currentGameState = 'ready';
+      
+      // Hide status, show ready message
+      document.getElementById('status').classList.add('hidden');
+      this.showStatus('Ready! Aim at START and say "BANG"');
 
     } catch (error) {
       console.error('Initialization error:', error);
@@ -51,23 +65,134 @@ class PolygonHandCannon {
     }
   }
 
+  startMenuTracking() {
+    // Track hand position for menu interaction
+    const trackMenu = () => {
+      if (this.currentGameState === 'ready') {
+        const handPos = this.handTracker.getPointerPosition();
+        const handDetected = this.handTracker.isHandDetected();
+
+        // Update hand status indicator
+        const handStatus = document.getElementById('handStatus');
+        if (handDetected) {
+          handStatus.textContent = 'HAND DETECTED';
+          handStatus.classList.add('detected');
+          handStatus.classList.remove('not-detected');
+        } else {
+          handStatus.textContent = 'NO HAND DETECTED';
+          handStatus.classList.remove('detected');
+          handStatus.classList.add('not-detected');
+        }
+
+        if (handPos) {
+          // Update crosshair position
+          this.crosshair.style.left = `${handPos.x}px`;
+          this.crosshair.style.top = `${handPos.y}px`;
+          this.handIndicator.style.left = `${handPos.x}px`;
+          this.handIndicator.style.top = `${handPos.y}px`;
+          this.handIndicator.style.opacity = '0.8';
+
+          // Check if hovering over start button
+          if (this.startButton) {
+            const rect = this.startButton.getBoundingClientRect();
+            const hovering = (
+              handPos.x >= rect.left &&
+              handPos.x <= rect.right &&
+              handPos.y >= rect.top &&
+              handPos.y <= rect.bottom
+            );
+
+            this.isHoveringStartButton = hovering;
+
+            if (hovering) {
+              this.crosshair.classList.add('targeting');
+              this.startButton.classList.add('targeted');
+            } else {
+              this.crosshair.classList.remove('targeting');
+              this.startButton.classList.remove('targeted');
+            }
+          }
+        } else {
+          this.handIndicator.style.opacity = '0';
+        }
+
+        requestAnimationFrame(trackMenu);
+      }
+    };
+
+    trackMenu();
+  }
+
   setupEventListeners() {
     const startBtn = document.getElementById('startBtn');
     const restartBtn = document.getElementById('restartBtn');
 
+    // Keep mouse click as backup
     startBtn.addEventListener('click', () => this.startGame());
     restartBtn.addEventListener('click', () => this.restartGame());
 
+    // Listen for voice commands
     this.voiceRecognition.on('command', (word) => this.handleVoiceCommand(word));
+  }
+
+  handleVoiceCommand(word) {
+    const feedback = document.getElementById('voiceFeedback');
+    feedback.textContent = `"${word}"`;
+    feedback.classList.add('show');
+
+    setTimeout(() => {
+      feedback.classList.remove('show');
+    }, 1000);
+
+    // Handle "bang" command to start game
+    if (this.currentGameState === 'ready') {
+      if (word.toLowerCase().includes('bang') || 
+          word.toLowerCase().includes('fire') || 
+          word.toLowerCase().includes('shoot')) {
+        
+        if (this.isHoveringStartButton) {
+          feedback.classList.add('correct');
+          feedback.classList.remove('incorrect');
+          feedback.textContent = '"BANG!" - STARTING GAME';
+          
+          setTimeout(() => {
+            this.startGame();
+          }, 500);
+        } else {
+          feedback.classList.add('incorrect');
+          feedback.classList.remove('correct');
+          feedback.textContent = 'AIM AT START BUTTON!';
+        }
+        return;
+      }
+    }
+
+    // Handle game commands during gameplay
+    if (this.currentGameState === 'playing') {
+      if (!this.targetedShape) {
+        feedback.classList.add('incorrect');
+        feedback.classList.remove('correct');
+        return;
+      }
+
+      if (word.toLowerCase() === this.targetedShape.type.toLowerCase()) {
+        feedback.classList.add('correct');
+        feedback.classList.remove('incorrect');
+
+        this.destroyShape(this.targetedShape);
+        this.gameState.addScore(100);
+      } else {
+        feedback.classList.add('incorrect');
+        feedback.classList.remove('correct');
+      }
+    }
   }
 
   async startGame() {
     document.getElementById('startScreen').classList.add('hidden');
     document.getElementById('status').classList.add('hidden');
 
-    await this.handTracker.start();
-    await this.voiceRecognition.start();
-
+    this.currentGameState = 'playing';
     this.gameState.reset();
     this.shapeSpawner.reset();
     this.particleSystem.reset();
@@ -77,7 +202,13 @@ class PolygonHandCannon {
 
   restartGame() {
     document.getElementById('gameOver').classList.remove('show');
-    this.startGame();
+    this.currentGameState = 'ready';
+    
+    // Restart menu tracking
+    this.startMenuTracking();
+    
+    // Show start screen again
+    document.getElementById('startScreen').classList.remove('hidden');
   }
 
   gameLoop() {
@@ -181,33 +312,6 @@ class PolygonHandCannon {
     return closestShape;
   }
 
-  handleVoiceCommand(word) {
-    const feedback = document.getElementById('voiceFeedback');
-    feedback.textContent = `"${word}"`;
-    feedback.classList.add('show');
-
-    setTimeout(() => {
-      feedback.classList.remove('show');
-    }, 1000);
-
-    if (!this.targetedShape) {
-      feedback.classList.add('incorrect');
-      feedback.classList.remove('correct');
-      return;
-    }
-
-    if (word.toLowerCase() === this.targetedShape.type.toLowerCase()) {
-      feedback.classList.add('correct');
-      feedback.classList.remove('incorrect');
-
-      this.destroyShape(this.targetedShape);
-      this.gameState.addScore(100);
-    } else {
-      feedback.classList.add('incorrect');
-      feedback.classList.remove('correct');
-    }
-  }
-
   destroyShape(shape) {
     this.particleSystem.createExplosion(shape.position, shape.color);
     this.shapeSpawner.removeShape(shape);
@@ -222,12 +326,10 @@ class PolygonHandCannon {
 
   gameOver() {
     this.gameState.isGameOver = true;
+    this.currentGameState = 'gameOver';
 
     document.getElementById('finalScore').textContent = this.gameState.score;
     document.getElementById('gameOver').classList.add('show');
-
-    this.handTracker.stop();
-    this.voiceRecognition.stop();
   }
 
   showStatus(message) {
@@ -238,5 +340,5 @@ class PolygonHandCannon {
   }
 }
 
-const game = new PolygonHandCannon();
+const game = new CognitiveCannonGame();
 game.init();
