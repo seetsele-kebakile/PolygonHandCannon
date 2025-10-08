@@ -1,5 +1,4 @@
 // src/game/shape-spawner.js
-
 export class ShapeSpawner {
   constructor(renderer) {
     this.renderer = renderer;
@@ -11,8 +10,8 @@ export class ShapeSpawner {
 
   reset() {
     this.shapes.forEach(shape => {
-      if (shape.vertexBuffer) shape.vertexBuffer.destroy();
-      if (shape.indexBuffer) shape.indexBuffer.destroy();
+      shape.vertexBuffer?.destroy();
+      shape.indexBuffer?.destroy();
     });
     this.shapes = [];
     this.spawnTimer = 0;
@@ -20,243 +19,199 @@ export class ShapeSpawner {
 
   update(deltaTime, wave) {
     this.spawnTimer += deltaTime;
-
     const spawnRate = Math.max(0.5, 2.0 - (wave * 0.1));
-
     if (this.spawnTimer >= spawnRate) {
       this.spawnTimer = 0;
       this.spawnRandomShape(wave);
     }
-
-    this.shapes.forEach(shape => {
-      shape.rotation[0] += deltaTime * 0.5;
-      shape.rotation[1] += deltaTime * 0.3;
-    });
   }
 
   spawnRandomShape(wave) {
     const type = this.shapeTypes[Math.floor(Math.random() * this.shapeTypes.length)];
-    
-    // --- THIS IS THE FIX ---
-    // Reduce the spawn range to keep shapes more centered.
-    // Was: x = (Math.random() - 0.5) * 6;
-    // Was: y = (Math.random() - 0.5) * 4;
-    const x = (Math.random() - 0.5) * 4; // Tighter horizontal spawn
-    const y = (Math.random() - 0.5) * 3; // Tighter vertical spawn
-    const z = -15;
+    let x, y, z = -15;
+    let positionIsValid = false;
+    const maxAttempts = 10;
+    const minDistance = 1.5;
+
+    for (let i = 0; i < maxAttempts && !positionIsValid; i++) {
+        x = (Math.random() - 0.5) * 4;
+        y = (Math.random() - 0.5) * 3;
+        positionIsValid = true;
+        for (const existingShape of this.shapes) {
+            const dist = Math.hypot(x - existingShape.position[0], y - existingShape.position[1]);
+            if (dist < minDistance) {
+                positionIsValid = false;
+                break;
+            }
+        }
+    }
+
+    if (!positionIsValid) return;
 
     const velocity = 1.0 + (wave * 0.1);
-
-    const shape = {
-      type,
-      position: [x, y, z],
-      rotation: [0, 0, 0],
-      velocity,
-      color: [1, 1, 1]
+    const shape = { 
+        type, 
+        position: [x, y, z], 
+        rotationX: 0,
+        rotationY: 0,
+        velocity, 
+        color: this.getShapeColor(type),
+        toBeRemoved: false
     };
-
     this.createShapeGeometry(shape);
     this.shapes.push(shape);
   }
+  
+  getShapeColor(type) {
+    switch(type) {
+      case 'cube': return [0.2, 0.6, 1.0];
+      case 'sphere': return [1.0, 0.5, 0.2];
+      case 'torus': return [0.8, 0.2, 1.0];
+      case 'pyramid': return [0.2, 1.0, 0.5];
+      default: return [1, 1, 1];
+    }
+  }
 
   createShapeGeometry(shape) {
-    let vertices, indices;
-
+    let data = { vertices: [], indices: [] };
     switch (shape.type) {
-      case 'cube':
-        ({ vertices, indices } = this.createCube());
-        break;
-      case 'sphere':
-        ({ vertices, indices } = this.createSphere());
-        break;
-      case 'torus':
-        ({ vertices, indices } = this.createTorus());
-        break;
-      case 'pyramid':
-        ({ vertices, indices } = this.createPyramid());
-        break;
+      case 'cube': data = this.createCube(); break;
+      case 'sphere': data = this.createSphere(); break;
+      case 'torus': data = this.createTorus(); break;
+      case 'pyramid': data = this.createPyramid(); break;
     }
-
+    const { vertices, indices } = data;
     const vertexData = new Float32Array(vertices);
     const indexData = new Uint16Array(indices);
-
-    shape.vertexBuffer = this.device.createBuffer({
-      size: vertexData.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
-    });
+    shape.vertexBuffer = this.device.createBuffer({ size: vertexData.byteLength, usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST });
     this.device.queue.writeBuffer(shape.vertexBuffer, 0, vertexData);
-
-    shape.indexBuffer = this.device.createBuffer({
-      size: indexData.byteLength,
-      usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST
-    });
+    shape.indexBuffer = this.device.createBuffer({ size: indexData.byteLength, usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
     this.device.queue.writeBuffer(shape.indexBuffer, 0, indexData);
-
     shape.indexCount = indices.length;
   }
 
   createCube() {
+    const s = 0.5;
     const vertices = [
-      // position // normal
-      -0.5,-0.5,0.5,  0,0,1,
-       0.5,-0.5,0.5,  0,0,1,
-       0.5,0.5,0.5,  0,0,1,
-      -0.5,0.5,0.5,  0,0,1,
-
-      -0.5,-0.5,-0.5, 0,0,-1,
-       0.5,-0.5,-0.5, 0,0,-1,
-       0.5,0.5,-0.5, 0,0,-1,
-      -0.5,0.5,-0.5, 0,0,-1,
+      -s, -s,  s,  0,  0,  1,  // Front face
+       s, -s,  s,  0,  0,  1,
+       s,  s,  s,  0,  0,  1,
+      -s,  s,  s,  0,  0,  1,
       
-      -0.5,0.5,-0.5, -1,0,0,
-      -0.5,0.5,0.5, -1,0,0,
-      -0.5,-0.5,0.5, -1,0,0,
-      -0.5,-0.5,-0.5, -1,0,0,
-
-       0.5,0.5,-0.5,  1,0,0,
-       0.5,0.5,0.5,  1,0,0,
-       0.5,-0.5,0.5,  1,0,0,
-       0.5,-0.5,-0.5,  1,0,0,
-
-      -0.5,-0.5,-0.5, 0,-1,0,
-       0.5,-0.5,-0.5, 0,-1,0,
-       0.5,-0.5,0.5, 0,-1,0,
-      -0.5,-0.5,0.5, 0,-1,0,
-
-      -0.5,0.5,-0.5, 0,1,0,
-       0.5,0.5,-0.5, 0,1,0,
-       0.5,0.5,0.5, 0,1,0,
-      -0.5,0.5,0.5, 0,1,0,
+      -s, -s, -s,  0,  0, -1, // Back face
+      -s,  s, -s,  0,  0, -1,
+       s,  s, -s,  0,  0, -1,
+       s, -s, -s,  0,  0, -1,
+       
+      -s,  s, -s,  0,  1,  0,  // Top face
+      -s,  s,  s,  0,  1,  0,
+       s,  s,  s,  0,  1,  0,
+       s,  s, -s,  0,  1,  0,
+       
+      -s, -s, -s,  0, -1,  0, // Bottom face
+       s, -s, -s,  0, -1,  0,
+       s, -s,  s,  0, -1,  0,
+      -s, -s,  s,  0, -1,  0,
+      
+       s, -s, -s,  1,  0,  0,  // Right face
+       s,  s, -s,  1,  0,  0,
+       s,  s,  s,  1,  0,  0,
+       s, -s,  s,  1,  0,  0,
+       
+      -s, -s, -s, -1,  0,  0, // Left face
+      -s, -s,  s, -1,  0,  0,
+      -s,  s,  s, -1,  0,  0,
+      -s,  s, -s, -1,  0,  0,
     ];
-
     const indices = [
-      0,1,2, 0,2,3,
-      4,5,6, 4,6,7,
-      8,9,10, 8,10,11,
-      12,13,14, 12,14,15,
-      16,17,18, 16,18,19,
-      20,21,22, 20,22,23
+       0,  1,  2,    0,  2,  3, // front
+       4,  5,  6,    4,  6,  7, // back
+       8,  9, 10,    8, 10, 11, // top
+      12, 13, 14,   12, 14, 15, // bottom
+      16, 17, 18,   16, 18, 19, // right
+      20, 21, 22,   20, 22, 23, // left
     ];
-
+    return { vertices, indices };
+  }
+  
+  createPyramid() {
+    const s = 0.5;
+    const h = 0.5;
+    const vertices = [
+      // Base vertices (y = -h)
+      -s, -h, -s,  0, -1,  0,
+       s, -h, -s,  0, -1,  0,
+       s, -h,  s,  0, -1,  0,
+      -s, -h,  s,  0, -1,  0,
+      // Tip vertex (y = h)
+       0,  h,  0,  1,  0,  0, // Normal isn't perfect but fine for this
+    ];
+    const indices = [
+      0, 1, 2,   0, 2, 3, // Base
+      0, 4, 1, // Sides (ensure counter-clockwise winding)
+      1, 4, 2,
+      2, 4, 3,
+      3, 4, 0,
+    ];
     return { vertices, indices };
   }
 
   createSphere() {
-    const vertices = [];
-    const indices = [];
-    const segments = 16;
-    const rings = 12;
-
-    for (let ring = 0; ring <= rings; ring++) {
-      const phi = (ring / rings) * Math.PI;
-      const y = Math.cos(phi);
-      const ringRadius = Math.sin(phi);
-
-      for (let seg = 0; seg <= segments; seg++) {
-        const theta = (seg / segments) * Math.PI * 2;
-        const x = ringRadius * Math.cos(theta);
-        const z = ringRadius * Math.sin(theta);
-
-        vertices.push(x * 0.5, y * 0.5, z * 0.5);
-        const len = Math.sqrt(x * x + y * y + z * z);
-        vertices.push(x / len, y / len, z / len);
+      const vertices = [], indices = [];
+      const radius = 0.5;
+      const segments = 16, rings = 12;
+      for (let i = 0; i <= rings; i++) {
+        const phi = i * Math.PI / rings;
+        for (let j = 0; j <= segments; j++) {
+          const theta = j * 2 * Math.PI / segments;
+          const x = -radius * Math.cos(theta) * Math.sin(phi);
+          const y = radius * Math.cos(phi);
+          const z = radius * Math.sin(theta) * Math.sin(phi);
+          vertices.push(x, y, z, x, y, z);
+        }
       }
-    }
-
-    for (let ring = 0; ring < rings; ring++) {
-      for (let seg = 0; seg < segments; seg++) {
-        const current = ring * (segments + 1) + seg;
-        const next = current + segments + 1;
-
-        indices.push(current, next, current + 1);
-        indices.push(current + 1, next, next + 1);
+      for (let i = 0; i < rings; i++) {
+        for (let j = 0; j < segments; j++) {
+          const first = (i * (segments + 1)) + j;
+          const second = first + segments + 1;
+          indices.push(first, second, first + 1, second, second + 1, first + 1);
+        }
       }
-    }
-
-    return { vertices, indices };
+      return { vertices, indices };
   }
-
+  
   createTorus() {
-    const vertices = [];
-    const indices = [];
-    const majorSegments = 20;
-    const minorSegments = 12;
-    const majorRadius = 0.4;
-    const minorRadius = 0.15;
-
-    for (let i = 0; i <= majorSegments; i++) {
-      const u = (i / majorSegments) * Math.PI * 2;
-      const cu = Math.cos(u);
-      const su = Math.sin(u);
-
-      for (let j = 0; j <= minorSegments; j++) {
-        const v = (j / minorSegments) * Math.PI * 2;
-        const cv = Math.cos(v);
-        const sv = Math.sin(v);
-
-        const x = (majorRadius + minorRadius * cv) * cu;
-        const y = minorRadius * sv;
-        const z = (majorRadius + minorRadius * cv) * su;
-
-        vertices.push(x, y, z);
-
-        const nx = cv * cu;
-        const ny = sv;
-        const nz = cv * su;
-        vertices.push(nx, ny, nz);
+      const vertices = [], indices = [];
+      const radius = 0.4, tube = 0.15;
+      const radialSegments = 20, tubularSegments = 12;
+      for (let i = 0; i <= radialSegments; i++) {
+        for (let j = 0; j <= tubularSegments; j++) {
+          const u = j / tubularSegments * Math.PI * 2;
+          const v = i / radialSegments * Math.PI * 2;
+          const x = (radius + tube * Math.cos(u)) * Math.cos(v);
+          const y = tube * Math.sin(u);
+          const z = (radius + tube * Math.cos(u)) * Math.sin(v);
+          const nx = Math.cos(u) * Math.cos(v);
+          const ny = Math.sin(u);
+          const nz = Math.cos(u) * Math.sin(v);
+          vertices.push(x, y, z, nx, ny, nz);
+        }
       }
-    }
-
-    for (let i = 0; i < majorSegments; i++) {
-      for (let j = 0; j < minorSegments; j++) {
-        const current = i * (minorSegments + 1) + j;
-        const next = current + minorSegments + 1;
-
-        indices.push(current, next, current + 1);
-        indices.push(current + 1, next, next + 1);
+      for (let i = 0; i < radialSegments; i++) {
+        for (let j = 0; j < tubularSegments; j++) {
+          const a = (tubularSegments + 1) * i + j;
+          const b = a + tubularSegments + 1;
+          indices.push(a, b, a + 1, b, b + 1, a + 1);
+        }
       }
-    }
-
-    return { vertices, indices };
-  }
-
-  createPyramid() {
-    const vertices = [
-       // position      // normal
-       // Top point
-       0, 0.5, 0,      0, 1, 0,
-
-       // Base points
-      -0.5, -0.5, 0.5,  0, -1, 0,
-       0.5, -0.5, 0.5,  0, -1, 0,
-       0.5, -0.5, -0.5, 0, -1, 0,
-      -0.5, -0.5, -0.5, 0, -1, 0,
-
-      // Slanted face normals need to be calculated properly,
-      // but for now this will at least render.
-       0, 0.5, 0,      0, 0.5, 0.5,
-       -0.5,-0.5,0.5,   0, 0.5, 0.5,
-       0.5,-0.5,0.5,    0, 0.5, 0.5,
-    ];
-
-    const indices = [
-      0, 1, 2,
-      0, 2, 3,
-      0, 3, 4,
-      0, 4, 1,
-      // Base
-      1, 3, 2,
-      1, 4, 3
-    ];
-
-    return { vertices, indices };
+      return { vertices, indices };
   }
 
   removeShape(shape) {
     const index = this.shapes.indexOf(shape);
     if (index > -1) {
-      if (shape.vertexBuffer) shape.vertexBuffer.destroy();
-      if (shape.indexBuffer) shape.indexBuffer.destroy();
+      shape.vertexBuffer?.destroy();
+      shape.indexBuffer?.destroy();
       this.shapes.splice(index, 1);
     }
   }
