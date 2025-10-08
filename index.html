@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Polygon Hand Cannon</title>
+  <title>Polygon Hand  Cannon</title>
   <style>
     * {
       margin: 0;
@@ -265,6 +265,32 @@
       cursor: pointer;
       font-weight: bold;
       pointer-events: auto;
+      transition: all 0.3s;
+    }
+
+    .restart-btn:hover {
+      background: #0c0;
+      transform: scale(1.05);
+      box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+    }
+
+    .restart-btn.targeted {
+      background: #ff0;
+      color: #000;
+      transform: scale(1.15);
+      box-shadow: 0 0 30px rgba(255, 255, 0, 0.8);
+      animation: targetedButton 0.5s ease-in-out infinite;
+    }
+
+    .restart-btn.targeted::before {
+      content: '🎯 ';
+    }
+
+    .restart-btn.targeted::after {
+      content: ' - SAY "BANG"!';
+      font-size: 14px;
+      display: block;
+      margin-top: 5px;
     }
 
     .voice-feedback {
@@ -367,6 +393,11 @@
     <div class="game-over" id="gameOver">
       <h2>GAME OVER</h2>
       <div class="final-score">FINAL SCORE: <span id="finalScore">0</span></div>
+      
+      <div class="instruction-highlight">
+        👉 Point at PLAY AGAIN and say "BANG" to restart! 👈
+      </div>
+      
       <button class="restart-btn" id="restartBtn">PLAY AGAIN</button>
     </div>
 
