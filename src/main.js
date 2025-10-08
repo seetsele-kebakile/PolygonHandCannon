@@ -23,6 +23,7 @@ class PolygonHandCannon {
     this.currentGameState = 'initializing'; // initializing, ready, playing, gameOver
     this.startButton = document.getElementById('startBtn');
     this.isHoveringStartButton = false;
+    this.isHoveringRestartButton = false;
   }
 
   async init() {
@@ -66,14 +67,15 @@ class PolygonHandCannon {
   }
 
   startMenuTracking() {
-    // Track hand position for menu interaction
+    // Track hand position for menu interaction (both start screen and game over)
     const trackMenu = () => {
-      if (this.currentGameState === 'ready') {
-        const handPos = this.handTracker.getPointerPosition();
-        const handDetected = this.handTracker.isHandDetected();
+      // Always track, but only interact with buttons in menu states
+      const handPos = this.handTracker.getPointerPosition();
+      const handDetected = this.handTracker.isHandDetected();
 
-        // Update hand status indicator
-        const handStatus = document.getElementById('handStatus');
+      // Always update hand status indicator
+      const handStatus = document.getElementById('handStatus');
+      if (handStatus) {
         if (handDetected) {
           handStatus.textContent = 'HAND DETECTED';
           handStatus.classList.add('detected');
@@ -83,18 +85,54 @@ class PolygonHandCannon {
           handStatus.classList.remove('detected');
           handStatus.classList.add('not-detected');
         }
+      }
 
-        if (handPos) {
-          // Update crosshair position
-          this.crosshair.style.left = `${handPos.x}px`;
-          this.crosshair.style.top = `${handPos.y}px`;
-          this.handIndicator.style.left = `${handPos.x}px`;
-          this.handIndicator.style.top = `${handPos.y}px`;
+      // Always update crosshair and hand indicator
+      if (handPos) {
+        this.crosshair.style.left = `${handPos.x}px`;
+        this.crosshair.style.top = `${handPos.y}px`;
+        this.handIndicator.style.left = `${handPos.x}px`;
+        this.handIndicator.style.top = `${handPos.y}px`;
+        
+        // Show hand indicator on menus, hide during gameplay
+        if (this.currentGameState === 'ready' || this.currentGameState === 'gameOver') {
           this.handIndicator.style.opacity = '0.8';
+        } else {
+          this.handIndicator.style.opacity = '0.6';
+        }
 
-          // Check if hovering over start button
+        // Check if hovering over start button (ready state)
+        if (this.currentGameState === 'ready' && this.startButton) {
+          const rect = this.startButton.getBoundingClientRect();
+          const hovering = (
+            handPos.x >= rect.left &&
+            handPos.x <= rect.right &&
+            handPos.y >= rect.top &&
+            handPos.y <= rect.bottom
+          );
+
+          this.isHoveringStartButton = hovering;
+
+          if (hovering) {
+            this.crosshair.classList.add('targeting');
+            this.startButton.classList.add('targeted');
+          } else {
+            this.crosshair.classList.remove('targeting');
+            this.startButton.classList.remove('targeted');
+          }
+        } else {
+          // Clean up when not in ready state
+          this.isHoveringStartButton = false;
           if (this.startButton) {
-            const rect = this.startButton.getBoundingClientRect();
+            this.startButton.classList.remove('targeted');
+          }
+        }
+
+        // Check if hovering over restart button (game over state)
+        if (this.currentGameState === 'gameOver') {
+          const restartButton = document.getElementById('restartBtn');
+          if (restartButton) {
+            const rect = restartButton.getBoundingClientRect();
             const hovering = (
               handPos.x >= rect.left &&
               handPos.x <= rect.right &&
@@ -102,22 +140,26 @@ class PolygonHandCannon {
               handPos.y <= rect.bottom
             );
 
-            this.isHoveringStartButton = hovering;
+            this.isHoveringRestartButton = hovering;
 
             if (hovering) {
               this.crosshair.classList.add('targeting');
-              this.startButton.classList.add('targeted');
+              restartButton.classList.add('targeted');
             } else {
               this.crosshair.classList.remove('targeting');
-              this.startButton.classList.remove('targeted');
+              restartButton.classList.remove('targeted');
             }
           }
         } else {
-          this.handIndicator.style.opacity = '0';
+          // Clean up when not in game over state
+          this.isHoveringRestartButton = false;
         }
-
-        requestAnimationFrame(trackMenu);
+      } else {
+        this.handIndicator.style.opacity = '0';
       }
+
+      // Keep tracking running forever
+      requestAnimationFrame(trackMenu);
     };
 
     trackMenu();
@@ -167,6 +209,29 @@ class PolygonHandCannon {
       }
     }
 
+    // Handle "bang" command to restart game from game over
+    if (this.currentGameState === 'gameOver') {
+      if (word.toLowerCase().includes('bang') || 
+          word.toLowerCase().includes('fire') || 
+          word.toLowerCase().includes('shoot')) {
+        
+        if (this.isHoveringRestartButton) {
+          feedback.classList.add('correct');
+          feedback.classList.remove('incorrect');
+          feedback.textContent = '"BANG!" - RESTARTING';
+          
+          setTimeout(() => {
+            this.restartGame();
+          }, 500);
+        } else {
+          feedback.classList.add('incorrect');
+          feedback.classList.remove('correct');
+          feedback.textContent = 'AIM AT PLAY AGAIN BUTTON!';
+        }
+        return;
+      }
+    }
+
     // Handle game commands during gameplay
     if (this.currentGameState === 'playing') {
       if (!this.targetedShape) {
@@ -197,6 +262,9 @@ class PolygonHandCannon {
     this.shapeSpawner.reset();
     this.particleSystem.reset();
 
+    // Keep hand tracking running during gameplay
+    // Don't stop it!
+
     this.gameLoop();
   }
 
@@ -204,10 +272,8 @@ class PolygonHandCannon {
     document.getElementById('gameOver').classList.remove('show');
     this.currentGameState = 'ready';
     
-    // Restart menu tracking
-    this.startMenuTracking();
-    
-    // Show start screen again
+    // Menu tracking is already running continuously
+    // Just show the start screen again
     document.getElementById('startScreen').classList.remove('hidden');
   }
 
@@ -218,31 +284,8 @@ class PolygonHandCannon {
     const deltaTime = (currentTime - this.lastTime) / 1000;
     this.lastTime = currentTime;
 
-    // Update hand tracking crosshair
+    // Get hand position (tracking is always running in background)
     const handPos = this.handTracker.getPointerPosition();
-    const handDetected = this.handTracker.isHandDetected();
-
-    // Update hand status indicator
-    const handStatus = document.getElementById('handStatus');
-    if (handDetected) {
-      handStatus.textContent = 'HAND DETECTED';
-      handStatus.classList.add('detected');
-      handStatus.classList.remove('not-detected');
-    } else {
-      handStatus.textContent = 'NO HAND DETECTED';
-      handStatus.classList.remove('detected');
-      handStatus.classList.add('not-detected');
-    }
-
-    if (handPos) {
-      this.crosshair.style.left = `${handPos.x}px`;
-      this.crosshair.style.top = `${handPos.y}px`;
-      this.handIndicator.style.left = `${handPos.x}px`;
-      this.handIndicator.style.top = `${handPos.y}px`;
-      this.handIndicator.style.opacity = '0.6';
-    } else {
-      this.handIndicator.style.opacity = '0';
-    }
 
     // Spawn new shapes
     this.shapeSpawner.update(deltaTime, this.gameState.wave);
@@ -260,7 +303,7 @@ class PolygonHandCannon {
     // Perform raycasting to find targeted shape
     this.targetedShape = this.performRaycast(handPos);
 
-    // Update crosshair appearance
+    // Update crosshair appearance for gameplay
     if (this.targetedShape) {
       this.crosshair.classList.add('targeting');
     } else {
@@ -330,6 +373,9 @@ class PolygonHandCannon {
 
     document.getElementById('finalScore').textContent = this.gameState.score;
     document.getElementById('gameOver').classList.add('show');
+
+    // Menu tracking is already running - just change state
+    // The tracking loop will automatically detect the gameOver state
   }
 
   showStatus(message) {
