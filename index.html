@@ -11,3 +11,333 @@
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cognitive Cannon - Hand Tracking</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #000;
+      color: #fff;
+      overflow: hidden;
+      cursor: none;
+    }
+
+    canvas {
+      width: 100vw;
+      height: 100vh;
+      display: block;
+    }
+
+    .ui-overlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      pointer-events: none;
+      z-index: 10;
+    }
+
+    .crosshair {
+      position: absolute;
+      width: 50px;
+      height: 50px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      transition: all 0.05s ease-out;
+    }
+
+    .crosshair::before {
+      content: '';
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      border: 3px solid rgba(0, 255, 0, 0.8);
+      border-radius: 50%;
+      box-shadow: 0 0 15px rgba(0, 255, 0, 0.6), inset 0 0 15px rgba(0, 255, 0, 0.3);
+    }
+
+    .crosshair::after {
+      content: '';
+      position: absolute;
+      width: 10px;
+      height: 10px;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: rgba(0, 255, 0, 0.9);
+      border-radius: 50%;
+      box-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
+    }
+
+    .crosshair.targeting {
+      animation: pulse 0.3s ease-in-out infinite;
+    }
+
+    .crosshair.targeting::before {
+      border-color: rgba(255, 255, 0, 0.9);
+      box-shadow: 0 0 20px rgba(255, 255, 0, 0.8), inset 0 0 20px rgba(255, 255, 0, 0.4);
+    }
+
+    .crosshair.targeting::after {
+      background: rgba(255, 255, 0, 1);
+      box-shadow: 0 0 15px rgba(255, 255, 0, 1);
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: translate(-50%, -50%) scale(1); }
+      50% { transform: translate(-50%, -50%) scale(1.3); }
+    }
+
+    .hand-indicator {
+      position: absolute;
+      font-size: 40px;
+      pointer-events: none;
+      filter: drop-shadow(0 0 10px rgba(0, 255, 0, 0.8));
+      transition: all 0.05s ease-out;
+    }
+
+    .hud {
+      position: absolute;
+      top: 20px;
+      left: 20px;
+      font-family: 'Courier New', monospace;
+      font-size: 24px;
+      text-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
+    }
+
+    .hud-item {
+      margin: 10px 0;
+      color: #0f0;
+    }
+
+    .status {
+      position: absolute;
+      top: 20px;
+      right: 20px;
+      padding: 15px 25px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 2px solid #0f0;
+      border-radius: 10px;
+      font-size: 14px;
+      max-width: 300px;
+    }
+
+    .start-screen {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      background: rgba(0, 0, 0, 0.9);
+      padding: 40px;
+      border: 3px solid #0f0;
+      border-radius: 15px;
+      max-width: 600px;
+    }
+
+    .start-screen h1 {
+      font-size: 48px;
+      margin-bottom: 20px;
+      color: #0f0;
+      text-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
+    }
+
+    .start-screen p {
+      margin: 15px 0;
+      line-height: 1.6;
+      color: #ccc;
+    }
+
+    .start-screen ul {
+      text-align: left;
+      margin: 20px auto;
+      max-width: 450px;
+    }
+
+    .start-screen li {
+      margin: 10px 0;
+      color: #ccc;
+    }
+
+    .start-btn {
+      margin-top: 30px;
+      padding: 15px 40px;
+      font-size: 20px;
+      background: #0f0;
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.3s;
+      pointer-events: auto;
+    }
+
+    .start-btn:hover {
+      background: #0c0;
+      transform: scale(1.05);
+      box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
+    }
+
+    .game-over {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      text-align: center;
+      background: rgba(0, 0, 0, 0.95);
+      padding: 50px;
+      border: 3px solid #f00;
+      border-radius: 15px;
+      display: none;
+    }
+
+    .game-over.show {
+      display: block;
+      animation: gameOverPulse 0.5s ease-in-out;
+    }
+
+    @keyframes gameOverPulse {
+      0% { transform: translate(-50%, -50%) scale(0.8); opacity: 0; }
+      100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+    }
+
+    .game-over h2 {
+      font-size: 60px;
+      color: #f00;
+      margin-bottom: 20px;
+      text-shadow: 0 0 30px rgba(255, 0, 0, 0.8);
+    }
+
+    .game-over .final-score {
+      font-size: 36px;
+      color: #fff;
+      margin: 20px 0;
+    }
+
+    .restart-btn {
+      margin-top: 20px;
+      padding: 15px 40px;
+      font-size: 18px;
+      background: #0f0;
+      color: #000;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      pointer-events: auto;
+    }
+
+    .voice-feedback {
+      position: absolute;
+      bottom: 30px;
+      left: 50%;
+      transform: translateX(-50%);
+      padding: 15px 30px;
+      background: rgba(0, 0, 0, 0.8);
+      border: 2px solid #0f0;
+      border-radius: 10px;
+      font-size: 18px;
+      color: #0f0;
+      opacity: 0;
+      transition: opacity 0.3s;
+    }
+
+    .voice-feedback.show {
+      opacity: 1;
+    }
+
+    .voice-feedback.correct {
+      border-color: #0f0;
+      color: #0f0;
+    }
+
+    .voice-feedback.incorrect {
+      border-color: #f00;
+      color: #f00;
+    }
+
+    .hand-status {
+      position: absolute;
+      bottom: 20px;
+      right: 20px;
+      padding: 10px 20px;
+      background: rgba(0, 0, 0, 0.7);
+      border: 2px solid #0f0;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #0f0;
+    }
+
+    .hand-status.detected {
+      border-color: #0f0;
+      color: #0f0;
+    }
+
+    .hand-status.not-detected {
+      border-color: #f80;
+      color: #f80;
+    }
+
+    .hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <canvas id="gpuCanvas"></canvas>
+  
+  <div class="ui-overlay">
+    <div class="crosshair" id="crosshair"></div>
+    <div class="hand-indicator" id="handIndicator">👆</div>
+
+    <div class="hud">
+      <div class="hud-item">SCORE: <span id="score">0</span></div>
+      <div class="hud-item">WAVE: <span id="wave">1</span></div>
+      <div class="hud-item">SHAPES: <span id="shapeCount">0</span></div>
+    </div>
+
+    <div class="status" id="status">
+      Initializing systems...
+    </div>
+
+    <div class="start-screen" id="startScreen">
+      <h1>Polygon Hand Cannon</h1>
+      <h3 style="color: #0f0; margin-bottom: 15px;">Hand Tracking Edition</h3>
+      <p>A first-person rail shooter controlled by hand gestures and voice!</p>
+      <ul>
+        <li><strong>AIM:</strong> Point your index finger to aim the crosshair</li>
+        <li><strong>FIRE:</strong> Say the shape name (cube, sphere, torus, pyramid)</li>
+        <li><strong>SURVIVE:</strong> Destroy shapes before they reach you</li>
+      </ul>
+      <p style="margin-top: 20px; font-size: 12px;">
+        Requires camera and microphone permissions<br>
+        Hold your hand in front of the camera and point with your index finger
+      </p>
+      <button class="start-btn" id="startBtn">START GAME</button>
+    </div>
+
+    <div class="game-over" id="gameOver">
+      <h2>GAME OVER</h2>
+      <div class="final-score">FINAL SCORE: <span id="finalScore">0</span></div>
+      <button class="restart-btn" id="restartBtn">PLAY AGAIN</button>
+    </div>
+
+    <div class="voice-feedback" id="voiceFeedback"></div>
+    <div class="hand-status detected" id="handStatus">HAND DETECTED</div>
+  </div>
+
+  <script type="module" src="/src/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,112 @@
+// Hand tracking using MediaPipe Hands
+import { Hands } from '@mediapipe/hands';
+import { Camera } from '@mediapipe/camera_utils';
+
+export class HandTracker {
+  constructor() {
+    this.hands = null;
+    this.camera = null;
+    this.video = null;
+    this.isRunning = false;
+    this.currentHandPos = null;
+    this.smoothedHandPos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
+    this.smoothing = 0.3;
+    this.handDetected = false;
+  }
+
+  async init() {
+    // Create hidden video element
+    this.video = document.createElement('video');
+    this.video.style.display = 'none';
+    this.video.width = 640;
+    this.video.height = 480;
+    document.body.appendChild(this.video);
+
+    // Initialize MediaPipe Hands
+    this.hands = new Hands({
+      locateFile: (file) => {
+        return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+      }
+    });
+
+    this.hands.setOptions({
+      maxNumHands: 1,
+      modelComplexity: 1,
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
+    });
+
+    this.hands.onResults((results) => this.onResults(results));
+  }
+
+  async start() {
+    if (this.isRunning) return;
+
+    this.camera = new Camera(this.video, {
+      onFrame: async () => {
+        await this.hands.send({ image: this.video });
+      },
+      width: 640,
+      height: 480
+    });
+
+    await this.camera.start();
+    this.isRunning = true;
+  }
+
+  onResults(results) {
+    if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+      this.handDetected = true;
+      const landmarks = results.multiHandLandmarks[0];
+      
+      // Use index finger tip (landmark 8)
+      const indexFingerTip = landmarks[8];
+      
+      // Convert normalized coordinates to screen coordinates
+      // Note: flip X coordinate for mirror effect
+      const x = (1 - indexFingerTip.x) * window.innerWidth;
+      const y = indexFingerTip.y * window.innerHeight;
+
+      this.currentHandPos = { x, y };
+
+      // Smooth the hand position
+      this.smoothedHandPos.x = this.smoothedHandPos.x * (1 - this.smoothing) + 
+                               this.currentHandPos.x * this.smoothing;
+      this.smoothedHandPos.y = this.smoothedHandPos.y * (1 - this.smoothing) + 
+                               this.currentHandPos.y * this.smoothing;
+    } else {
+      this.handDetected = false;
+      this.currentHandPos = null;
+    }
+  }
+
+  getPointerPosition() {
+    return this.isRunning && this.currentHandPos ? this.smoothedHandPos : null;
+  }
+
+  isHandDetected() {
+    return this.handDetected;
+  }
+
+  stop() {
+    if (!this.isRunning) return;
+    
+    if (this.camera) {
+      this.camera.stop();
+    }
+    
+    this.isRunning = false;
+  }
+
+  destroy() {
+    this.stop();
+    
+    if (this.video && this.video.parentNode) {
+      this.video.parentNode.removeChild(this.video);
+    }
+    
+    if (this.hands) {
+      this.hands.close();
+    }
+  }
+}

@@ -1,14 +1,35 @@
 {
-  "name": "package.json",
+  "name": "Polygon Hand Cannon",
   "private": true,
-  "version": "0.0.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "deploy": "npm run build && gh-pages -d dist"
   },
   "devDependencies": {
+    "gh-pages": "^6.1.1",
     "vite": "^7.1.7"
-  }
+  },
+  "dependencies": {
+    "@mediapipe/hands": "^0.4.1646424915",
+    "@mediapipe/camera_utils": "^0.3.1620248385",
+    "gl-matrix": "^3.4.4"
+  },
+  "description": "First-person rail shooter controlled by hand tracking and voice commands",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/seetsele-kebakile/PolygonHandCannon.git"
+  },
+  "keywords": [
+    "webgpu",
+    "hand-tracking",
+    "voice-recognition",
+    "mediapipe",
+    "game"
+  ],
+  "author": "",
+  "license": "MIT"
 }

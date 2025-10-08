@@ -1,8 +1,10 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vite';
 
 export default defineConfig({
-  base: '/PolygonHandCannon/',  // Must match your repo name
+  base: '/PolygonHandCannon/',
   build: {
     outDir: 'dist',
+    assetsDir: 'assets',
+    sourcemap: true,
   }
-})
+});
