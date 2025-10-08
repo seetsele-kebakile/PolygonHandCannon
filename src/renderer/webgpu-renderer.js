@@ -1,4 +1,3 @@
-// src/renderer/webgpu-renderer.js
 import { mat4, vec3 } from 'gl-matrix';
 import shapeVertexShader from '../shaders/shape-vertex.wgsl?raw';
 import shapeFragmentShader from '../shaders/shape-fragment.wgsl?raw';
@@ -16,9 +15,9 @@ export class WebGPURenderer {
     this.depthTexture = null;
     this.cameraUniformBuffer = null;
     this.shapeUniformBuffer = null;
-    this.particleUniformBuffer = null; // New buffer for particles
-    this.shapeBindGroup = null; // Renamed for clarity
-    this.particleBindGroup = null; // New bind group for particles
+    this.particleUniformBuffer = null;
+    this.shapeBindGroup = null;
+    this.particleBindGroup = null;
     this.viewMatrix = mat4.create();
     this.projectionMatrix = mat4.create();
   }
@@ -49,7 +48,7 @@ export class WebGPURenderer {
 
   createUniformBuffers() {
     this.cameraUniformBuffer = this.device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    this.shapeUniformBuffer = this.device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    this.shapeUniformBuffer = this.device.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.particleUniformBuffer = this.device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   }
 
@@ -60,24 +59,10 @@ export class WebGPURenderer {
         { binding: 1, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } }
       ]
     });
-
-    this.shapeBindGroup = this.device.createBindGroup({
-      layout: bindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.cameraUniformBuffer } },
-        { binding: 1, resource: { buffer: this.shapeUniformBuffer } }
-      ]
-    });
-
-    this.particleBindGroup = this.device.createBindGroup({
-      layout: bindGroupLayout,
-      entries: [
-        { binding: 0, resource: { buffer: this.cameraUniformBuffer } },
-        { binding: 1, resource: { buffer: this.particleUniformBuffer } }
-      ]
-    });
-
     const pipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
+
+    this.shapeBindGroup = this.device.createBindGroup({ layout: bindGroupLayout, entries: [{ binding: 0, resource: { buffer: this.cameraUniformBuffer } }, { binding: 1, resource: { buffer: this.shapeUniformBuffer } }] });
+    this.particleBindGroup = this.device.createBindGroup({ layout: bindGroupLayout, entries: [{ binding: 0, resource: { buffer: this.cameraUniformBuffer } }, { binding: 1, resource: { buffer: this.particleUniformBuffer } }] });
 
     this.shapePipeline = this.device.createRenderPipeline({
       layout: pipelineLayout,
@@ -90,7 +75,7 @@ export class WebGPURenderer {
     this.particlePipeline = this.device.createRenderPipeline({
       layout: pipelineLayout,
       vertex: { module: this.device.createShaderModule({ code: particleVertexShader }), entryPoint: 'main', buffers: [{ arrayStride: 24, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }, { shaderLocation: 1, offset: 12, format: 'float32x3' }] }] },
-      fragment: { module: this.device.createShaderModule({ code: particleFragmentShader }), entryPoint: 'main', targets: [{ format: this.format, blend: { color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' }, alpha: { srcFactor: 'one', dstFactor: 'one', operation: 'add' } } }] },
+      fragment: { module: this.device.createShaderModule({ code: particleFragmentShader }), entryPoint: 'main', targets: [{ format: this.format, blend: { color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' }, alpha: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' } } }] },
       primitive: { topology: 'triangle-list' },
       depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'less' }
     });
@@ -123,16 +108,19 @@ export class WebGPURenderer {
   }
 
   renderShape(renderPass, shape, isTargeted) {
-    const shapeData = new Float32Array(20);
+    const shapeData = new Float32Array(24);
     const modelMatrix = mat4.create();
     mat4.translate(modelMatrix, modelMatrix, shape.position);
     mat4.rotateY(modelMatrix, modelMatrix, shape.rotationY);
     mat4.rotateX(modelMatrix, modelMatrix, shape.rotationX);
+    
     shapeData.set(modelMatrix, 0);
-    shapeData[16] = Math.max(0, Math.min(1, (10 - Math.abs(shape.position[2])) / 8));
-    shapeData[17] = isTargeted ? 1.0 : 0.0;
-    shapeData[18] = performance.now() / 1000;
+    shapeData.set(shape.color, 16);
+    shapeData[20] = Math.max(0, Math.min(1, (10 - Math.abs(shape.position[2])) / 8));
+    shapeData[21] = isTargeted ? 1.0 : 0.0;
+    
     this.device.queue.writeBuffer(this.shapeUniformBuffer, 0, shapeData);
+    
     renderPass.setVertexBuffer(0, shape.vertexBuffer);
     renderPass.setIndexBuffer(shape.indexBuffer, 'uint16');
     renderPass.drawIndexed(shape.indexCount);
@@ -150,12 +138,40 @@ export class WebGPURenderer {
   }
   
   projectToScreen(worldPos) {
-      const vpMatrix = mat4.multiply(mat4.create(), this.projectionMatrix, this.viewMatrix);
-      const clipPos = vec3.transformMat4(vec3.create(), worldPos, vpMatrix);
-      if (Math.abs(clipPos[2]) > 1.0) return null;
-      return { x: (clipPos[0] + 1) * 0.5 * this.canvas.width, y: (1 - clipPos[1]) * 0.5 * this.canvas.height };
+    // FIX: Corrected projection math - was not handling perspective division properly
+    const vpMatrix = mat4.multiply(mat4.create(), this.projectionMatrix, this.viewMatrix);
+    const clipPos = vec3.transformMat4(vec3.create(), worldPos, vpMatrix);
+    
+    // Skip if behind camera
+    if (clipPos[2] < 0) return null;
+    
+    // Perspective division for NDC
+    const ndcX = clipPos[0] / clipPos[2];
+    const ndcY = clipPos[1] / clipPos[2];
+    
+    // Check if in viewport
+    if (ndcX < -1 || ndcX > 1 || ndcY < -1 || ndcY > 1) return null;
+    
+    // Convert to screen space
+    return { 
+      x: (ndcX + 1) * 0.5 * this.canvas.width, 
+      y: (1 - ndcY) * 0.5 * this.canvas.height 
+    };
   }
 
-  handleResize() { /* ... unchanged ... */ }
-  destroy() { /* ... unchanged ... */ }
+  handleResize() {
+    if (!this.device) return;
+    this.canvas.width = window.innerWidth;
+    this.canvas.height = window.innerHeight;
+    this.depthTexture.destroy();
+    this.createDepthTexture();
+    this.context.configure({ device: this.device, format: this.format, alphaMode: 'premultiplied' });
+  }
+
+  destroy() {
+    this.depthTexture?.destroy();
+    this.cameraUniformBuffer?.destroy();
+    this.shapeUniformBuffer?.destroy();
+    this.particleUniformBuffer?.destroy();
+  }
 }

@@ -1,9 +1,9 @@
-// src/main.js
 import { WebGPURenderer } from './renderer/webgpu-renderer.js';
 import { GameState } from './game/game-state.js';
 import { ShapeSpawner } from './game/shape-spawner.js';
 import { HandTracker } from './input/hand-tracker.js';
 import { ParticleSystem } from './effects/particle-system.js';
+import { SoundManager } from './audio/sound-manager.js';
 
 class PolygonHandCannon {
   constructor() {
@@ -13,6 +13,7 @@ class PolygonHandCannon {
     this.shapeSpawner = null;
     this.handTracker = null;
     this.particleSystem = null;
+    this.soundManager = null;
     this.isInitialized = false;
     this.lastTime = performance.now();
     this.crosshair = document.getElementById('crosshair');
@@ -24,6 +25,7 @@ class PolygonHandCannon {
 
   async init() {
     try {
+      this.soundManager = new SoundManager();
       this.handTracker = new HandTracker();
       await this.handTracker.init();
       await this.handTracker.start();
@@ -86,8 +88,10 @@ class PolygonHandCannon {
   }
 
   updateUI(handPos, isShooting) {
-    if (handPos) this.crosshair.style.left = `${handPos.x}px`;
-    if (handPos) this.crosshair.style.top = `${handPos.y}px`;
+    if (handPos) {
+      this.crosshair.style.left = `${handPos.x}px`;
+      this.crosshair.style.top = `${handPos.y}px`;
+    }
 
     const handleMenuInteraction = (buttonId, action) => {
         const button = document.getElementById(buttonId);
@@ -121,26 +125,31 @@ class PolygonHandCannon {
     if (isShooting && this.canShoot && this.targetedShape) {
       this.destroyShape(this.targetedShape);
       this.gameState.addScore(100);
+      this.soundManager.playShootSound();
       this.canShoot = false;
-      this.targetedShape = null; // Untarget after destroying
+      this.targetedShape = null;
     }
     if (!isShooting) this.canShoot = true;
 
+    // Update shape positions and check game over
     for (const shape of shapes) {
         if (shape.toBeRemoved) continue;
         shape.position[2] += shape.velocity * deltaTime;
         shape.rotationX += deltaTime * 0.5;
         shape.rotationY += deltaTime * 0.3;
+        
+        // Calculate threat level (0 = green, 1 = red) based on distance
+        // Shapes start at z = -15, approach at z = 1
+        shape.threat = Math.max(0, Math.min(1, (-shape.position[2] - 1) / 14));
+        
         if (shape.position[2] > 1) {
             this.gameOver();
             break;
         }
     }
     
-    const shapesToKeep = shapes.filter(shape => !shape.toBeRemoved);
-    if(shapesToKeep.length < shapes.length) {
-        this.shapeSpawner.shapes = shapesToKeep;
-    }
+    // FIX: Only remove shapes marked for deletion - don't filter here
+    // Filtering was causing shapes to be removed twice
   }
   
   destroyShape(shape) {
@@ -152,7 +161,7 @@ class PolygonHandCannon {
   performRaycast(handPos, shapes) {
     if (!handPos) return null;
     let closestShape = null;
-    let minDistance = 60;
+    let minDistance = 100; // FIX: Increased from 60 to 100 for better targeting at distance
     for (const shape of shapes) {
       if (shape.toBeRemoved) continue;
       const projected = this.renderer.projectToScreen(shape.position);
@@ -175,4 +184,4 @@ class PolygonHandCannon {
   }
 }
 
-new PolygonHandCannon().init();
+new PolygonHandCannon().init()

@@ -1,4 +1,3 @@
-// src/game/shape-spawner.js
 export class ShapeSpawner {
   constructor(renderer) {
     this.renderer = renderer;
@@ -24,6 +23,16 @@ export class ShapeSpawner {
       this.spawnTimer = 0;
       this.spawnRandomShape(wave);
     }
+    
+    // FIX: Clean up destroyed shapes here instead of in main.js
+    this.shapes = this.shapes.filter(shape => {
+      if (shape.toBeRemoved) {
+        shape.vertexBuffer?.destroy();
+        shape.indexBuffer?.destroy();
+        return false;
+      }
+      return true;
+    });
   }
 
   spawnRandomShape(wave) {
@@ -93,66 +102,32 @@ export class ShapeSpawner {
   createCube() {
     const s = 0.5;
     const vertices = [
-      -s, -s,  s,  0,  0,  1,  // Front face
-       s, -s,  s,  0,  0,  1,
-       s,  s,  s,  0,  0,  1,
-      -s,  s,  s,  0,  0,  1,
-      
-      -s, -s, -s,  0,  0, -1, // Back face
-      -s,  s, -s,  0,  0, -1,
-       s,  s, -s,  0,  0, -1,
-       s, -s, -s,  0,  0, -1,
-       
-      -s,  s, -s,  0,  1,  0,  // Top face
-      -s,  s,  s,  0,  1,  0,
-       s,  s,  s,  0,  1,  0,
-       s,  s, -s,  0,  1,  0,
-       
-      -s, -s, -s,  0, -1,  0, // Bottom face
-       s, -s, -s,  0, -1,  0,
-       s, -s,  s,  0, -1,  0,
-      -s, -s,  s,  0, -1,  0,
-      
-       s, -s, -s,  1,  0,  0,  // Right face
-       s,  s, -s,  1,  0,  0,
-       s,  s,  s,  1,  0,  0,
-       s, -s,  s,  1,  0,  0,
-       
-      -s, -s, -s, -1,  0,  0, // Left face
-      -s, -s,  s, -1,  0,  0,
-      -s,  s,  s, -1,  0,  0,
-      -s,  s, -s, -1,  0,  0,
+      -s,-s,s,0,0,1, s,-s,s,0,0,1, s,s,s,0,0,1, -s,s,s,0,0,1,
+      -s,-s,-s,0,0,-1, -s,s,-s,0,0,-1, s,s,-s,0,0,-1, s,-s,-s,0,0,-1,
+      -s,s,-s,0,1,0, -s,s,s,0,1,0, s,s,s,0,1,0, s,s,-s,0,1,0,
+      -s,-s,-s,0,-1,0, s,-s,-s,0,-1,0, s,-s,s,0,-1,0, -s,-s,s,0,-1,0,
+      s,-s,-s,1,0,0, s,s,-s,1,0,0, s,s,s,1,0,0, s,-s,s,1,0,0,
+      -s,-s,-s,-1,0,0, -s,-s,s,-1,0,0, -s,s,s,-1,0,0, -s,s,-s,-1,0,0,
     ];
     const indices = [
-       0,  1,  2,    0,  2,  3, // front
-       4,  5,  6,    4,  6,  7, // back
-       8,  9, 10,    8, 10, 11, // top
-      12, 13, 14,   12, 14, 15, // bottom
-      16, 17, 18,   16, 18, 19, // right
-      20, 21, 22,   20, 22, 23, // left
+      0,1,2, 0,2,3, 4,5,6, 4,6,7, 8,9,10, 8,10,11,
+      12,13,14, 12,14,15, 16,17,18, 16,18,19, 20,21,22, 20,22,23,
     ];
     return { vertices, indices };
   }
   
   createPyramid() {
-    const s = 0.5;
-    const h = 0.5;
+    const s = 0.5, h = 0.5;
+    const n = Math.sqrt(h*h + s*s);
+    const nxz = h/n, ny = s/n;
     const vertices = [
-      // Base vertices (y = -h)
-      -s, -h, -s,  0, -1,  0,
-       s, -h, -s,  0, -1,  0,
-       s, -h,  s,  0, -1,  0,
-      -s, -h,  s,  0, -1,  0,
-      // Tip vertex (y = h)
-       0,  h,  0,  1,  0,  0, // Normal isn't perfect but fine for this
+      -s,-h,-s,0,-1,0, s,-h,-s,0,-1,0, s,-h,s,0,-1,0, -s,-h,s,0,-1,0,
+      0,h,0,0,ny,nxz, -s,-h,s,0,ny,nxz, s,-h,s,0,ny,nxz,
+      0,h,0,0,ny,-nxz, s,-h,-s,0,ny,-nxz, -s,-h,-s,0,ny,-nxz,
+      0,h,0,nxz,ny,0, s,-h,s,nxz,ny,0, s,-h,-s,nxz,ny,0,
+      0,h,0,-nxz,ny,0, -s,-h,-s,-nxz,ny,0, -s,-h,s,-nxz,ny,0,
     ];
-    const indices = [
-      0, 1, 2,   0, 2, 3, // Base
-      0, 4, 1, // Sides (ensure counter-clockwise winding)
-      1, 4, 2,
-      2, 4, 3,
-      3, 4, 0,
-    ];
+    const indices = [ 0,1,2,0,2,3, 4,5,6, 7,8,9, 10,11,12, 13,14,15 ];
     return { vertices, indices };
   }
 
