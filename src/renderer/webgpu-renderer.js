@@ -1,4 +1,4 @@
-import { mat4, vec3 } from 'gl-matrix';
+import { mat4, vec3, vec4 } from 'gl-matrix';
 import shapeVertexShader from '../shaders/shape-vertex.wgsl?raw';
 import shapeFragmentShader from '../shaders/shape-fragment.wgsl?raw';
 import particleVertexShader from '../shaders/particle-vertex.wgsl?raw';
@@ -14,10 +14,9 @@ export class WebGPURenderer {
     this.particlePipeline = null;
     this.depthTexture = null;
     this.cameraUniformBuffer = null;
-    this.shapeUniformBuffer = null;
     this.particleUniformBuffer = null;
-    this.shapeBindGroup = null;
     this.particleBindGroup = null;
+    this.shapeBindGroupLayout = null; // Exposed for the spawner
     this.viewMatrix = mat4.create();
     this.projectionMatrix = mat4.create();
   }
@@ -34,7 +33,7 @@ export class WebGPURenderer {
     this.createDepthTexture();
     this.createUniformBuffers();
     this.createPipelines();
-    mat4.lookAt(this.viewMatrix, vec3.fromValues(0, 0, 0), vec3.fromValues(0, 0, -1), vec3.fromValues(0, 1, 0));
+    mat4.lookAt(this.viewMatrix, vec3.fromValues(0, 0, 5), vec3.fromValues(0, 0, 0), vec3.fromValues(0, 1, 0));
     window.addEventListener('resize', () => this.handleResize());
   }
 
@@ -48,37 +47,50 @@ export class WebGPURenderer {
 
   createUniformBuffers() {
     this.cameraUniformBuffer = this.device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    this.shapeUniformBuffer = this.device.createBuffer({ size: 96, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     this.particleUniformBuffer = this.device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   }
 
   createPipelines() {
-    const bindGroupLayout = this.device.createBindGroupLayout({
+    this.shapeBindGroupLayout = this.device.createBindGroupLayout({
       entries: [
         { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } }
       ]
     });
-    const pipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [bindGroupLayout] });
+    const pipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [this.shapeBindGroupLayout] });
 
-    this.shapeBindGroup = this.device.createBindGroup({ layout: bindGroupLayout, entries: [{ binding: 0, resource: { buffer: this.cameraUniformBuffer } }, { binding: 1, resource: { buffer: this.shapeUniformBuffer } }] });
-    this.particleBindGroup = this.device.createBindGroup({ layout: bindGroupLayout, entries: [{ binding: 0, resource: { buffer: this.cameraUniformBuffer } }, { binding: 1, resource: { buffer: this.particleUniformBuffer } }] });
+    // Particle bind group still uses the same layout structure
+    this.particleBindGroup = this.device.createBindGroup({ layout: this.shapeBindGroupLayout, entries: [{ binding: 0, resource: { buffer: this.cameraUniformBuffer } }, { binding: 1, resource: { buffer: this.particleUniformBuffer } }] });
 
     this.shapePipeline = this.device.createRenderPipeline({
       layout: pipelineLayout,
-      vertex: { module: this.device.createShaderModule({ code: shapeVertexShader }), entryPoint: 'main', buffers: [{ arrayStride: 24, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }, { shaderLocation: 1, offset: 12, format: 'float32x3' }] }] },
-      fragment: { module: this.device.createShaderModule({ code: shapeFragmentShader }), entryPoint: 'main', targets: [{ format: this.format }] },
+      vertex: {
+        module: this.device.createShaderModule({ code: shapeVertexShader }),
+        entryPoint: 'main',
+        buffers: [{
+          arrayStride: 24,
+          attributes: [
+            { shaderLocation: 0, offset: 0, format: 'float32x3' },  // Position
+            { shaderLocation: 1, offset: 12, format: 'float32x3' } // Normal
+          ]
+        }]
+      },
+      fragment: {
+        module: this.device.createShaderModule({ code: shapeFragmentShader }),
+        entryPoint: 'main',
+        targets: [{ format: this.format }]
+      },
       primitive: { topology: 'triangle-list', cullMode: 'back' },
       depthStencil: { format: 'depth24plus', depthWriteEnabled: true, depthCompare: 'less' }
     });
 
     this.particlePipeline = this.device.createRenderPipeline({
-      layout: pipelineLayout,
-      vertex: { module: this.device.createShaderModule({ code: particleVertexShader }), entryPoint: 'main', buffers: [{ arrayStride: 24, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }, { shaderLocation: 1, offset: 12, format: 'float32x3' }] }] },
-      fragment: { module: this.device.createShaderModule({ code: particleFragmentShader }), entryPoint: 'main', targets: [{ format: this.format, blend: { color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' }, alpha: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' } } }] },
-      primitive: { topology: 'triangle-list' },
-      depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'less' }
-    });
+        layout: pipelineLayout,
+        vertex: { module: this.device.createShaderModule({ code: particleVertexShader }), entryPoint: 'main', buffers: [{ arrayStride: 24, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }, { shaderLocation: 1, offset: 12, format: 'float32x3' }] }] },
+        fragment: { module: this.device.createShaderModule({ code: particleFragmentShader }), entryPoint: 'main', targets: [{ format: this.format, blend: { color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' }, alpha: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' } } }] },
+        primitive: { topology: 'triangle-list' },
+        depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'less' }
+      });
   }
 
   render({ shapes, particles, targetedShape }) {
@@ -94,13 +106,12 @@ export class WebGPURenderer {
       depthStencilAttachment: { view: this.depthTexture.createView(), depthClearValue: 1.0, depthLoadOp: 'clear', depthStoreOp: 'store' }
     });
 
+    // Render Shapes
     renderPass.setPipeline(this.shapePipeline);
-    renderPass.setBindGroup(0, this.shapeBindGroup);
-    
-    // FIX: Filter shapes before rendering to ensure we only draw valid shapes
     const validShapes = shapes.filter(s => s && s.vertexBuffer && s.indexBuffer && !s.toBeRemoved);
     validShapes.forEach(shape => this.renderShape(renderPass, shape, shape === targetedShape));
 
+    // Render Particles
     if (particles && particles.length > 0) {
       renderPass.setPipeline(this.particlePipeline);
       renderPass.setBindGroup(0, this.particleBindGroup);
@@ -111,9 +122,8 @@ export class WebGPURenderer {
   }
 
   renderShape(renderPass, shape, isTargeted) {
-    // Validate shape has required buffers
-    if (!shape.vertexBuffer || !shape.indexBuffer || !shape.indexCount) {
-      return; // Skip invalid shapes
+    if (!shape.vertexBuffer || !shape.indexBuffer || !shape.indexCount || !shape.uniformBuffer || !shape.bindGroup) {
+      return;
     }
 
     const shapeData = new Float32Array(24);
@@ -124,12 +134,14 @@ export class WebGPURenderer {
     
     shapeData.set(modelMatrix, 0);
     shapeData.set(shape.color, 16);
-    // Threat: shapes approach from z=-15 to z=1, calculate threat based on proximity
     shapeData[20] = Math.max(0, Math.min(1, shape.threat !== undefined ? shape.threat : 0));
     shapeData[21] = isTargeted ? 1.0 : 0.0;
     
-    this.device.queue.writeBuffer(this.shapeUniformBuffer, 0, shapeData);
+    // Write to this shape's specific uniform buffer
+    this.device.queue.writeBuffer(shape.uniformBuffer, 0, shapeData);
     
+    // Set this shape's specific bind group
+    renderPass.setBindGroup(0, shape.bindGroup);
     renderPass.setVertexBuffer(0, shape.vertexBuffer);
     renderPass.setIndexBuffer(shape.indexBuffer, 'uint16');
     renderPass.drawIndexed(shape.indexCount);
@@ -147,28 +159,19 @@ export class WebGPURenderer {
   }
   
   projectToScreen(worldPos) {
-    // FIX: Corrected projection math - handle shapes near/past camera
     const vpMatrix = mat4.multiply(mat4.create(), this.projectionMatrix, this.viewMatrix);
-    const clipPos = vec3.transformMat4(vec3.create(), worldPos, vpMatrix);
-    
-    // Skip if behind camera (negative z in clip space means behind)
-    // But allow very close shapes to still be targetable
-    if (clipPos[2] < -0.5) return null;
-    
-    // Avoid division by zero for shapes exactly at camera
-    if (Math.abs(clipPos[2]) < 0.01) return null;
-    
-    // Perspective division for NDC
-    const ndcX = clipPos[0] / clipPos[2];
-    const ndcY = clipPos[1] / clipPos[2];
-    
-    // Check if in viewport (allow some margin for near shapes)
-    if (ndcX < -2 || ndcX > 2 || ndcY < -2 || ndcY > 2) return null;
-    
-    // Convert to screen space
-    return { 
-      x: (ndcX + 1) * 0.5 * this.canvas.width, 
-      y: (1 - ndcY) * 0.5 * this.canvas.height 
+    const clipPos = vec4.transformMat4(vec4.create(), vec4.fromValues(worldPos[0], worldPos[1], worldPos[2], 1.0), vpMatrix);
+
+    if (clipPos[3] <= 0) {
+      return null;
+    }
+
+    const ndcX = clipPos[0] / clipPos[3];
+    const ndcY = clipPos[1] / clipPos[3];
+
+    return {
+      x: (ndcX + 1) * 0.5 * this.canvas.width,
+      y: (1 - ndcY) * 0.5 * this.canvas.height
     };
   }
 
@@ -184,7 +187,6 @@ export class WebGPURenderer {
   destroy() {
     this.depthTexture?.destroy();
     this.cameraUniformBuffer?.destroy();
-    this.shapeUniformBuffer?.destroy();
     this.particleUniformBuffer?.destroy();
   }
 }

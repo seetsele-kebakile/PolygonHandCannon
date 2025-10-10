@@ -129,27 +129,25 @@ class PolygonHandCannon {
       this.canShoot = false;
       this.targetedShape = null;
     }
+    
     if (!isShooting) this.canShoot = true;
 
-    // Update shape positions and check game over
+    // Update shape positions and check for game over
     for (const shape of shapes) {
         if (shape.toBeRemoved) continue;
         shape.position[2] += shape.velocity * deltaTime;
         shape.rotationX += deltaTime * 0.5;
         shape.rotationY += deltaTime * 0.3;
         
-        // Calculate threat level (0 = green, 1 = red) based on distance
-        // Shapes start at z = -15, approach at z = 1
-        shape.threat = Math.max(0, Math.min(1, (-shape.position[2] - 1) / 14));
+        // Threat calculation for the new coordinate space (z=-10 to z=-5)
+        shape.threat = Math.max(0, Math.min(1, (shape.position[2] + 10) / 5));
         
-        if (shape.position[2] > 1) {
+        // Game over check for the new coordinate space
+        if (shape.position[2] > -5) {
             this.gameOver();
             break;
         }
     }
-    
-    // FIX: Only remove shapes marked for deletion - don't filter here
-    // Filtering was causing shapes to be removed twice
   }
   
   destroyShape(shape) {
@@ -161,7 +159,7 @@ class PolygonHandCannon {
   performRaycast(handPos, shapes) {
     if (!handPos) return null;
     let closestShape = null;
-    let minDistance = 100; // FIX: Increased from 60 to 100 for better targeting at distance
+    let minDistance = 100;
     for (const shape of shapes) {
       if (shape.toBeRemoved) continue;
       const projected = this.renderer.projectToScreen(shape.position);

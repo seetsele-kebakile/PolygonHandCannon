@@ -14,7 +14,6 @@ export class ParticleSystem {
 
   createExplosion(position, color) {
     const particleCount = 30;
-
     for (let i = 0; i < particleCount; i++) {
       const angle = (i / particleCount) * Math.PI * 2;
       const speed = 2 + Math.random() * 3;
@@ -30,7 +29,8 @@ export class ParticleSystem {
         velocity,
         color: color || [1, 0.5, 0],
         life: 1.0,
-        size: 0.1 + Math.random() * 0.1
+        size: 0.1 + Math.random() * 0.1,
+        vertexBuffer: null
       };
 
       this.createParticleGeometry(particle);
@@ -41,16 +41,14 @@ export class ParticleSystem {
   createParticleGeometry(particle) {
     const s = particle.size;
     const vertices = [
-      -s, -s, 0, ...particle.color, 1.0,
-       s, -s, 0, ...particle.color, 1.0,
-       s,  s, 0, ...particle.color, 1.0,
-      -s, -s, 0, ...particle.color, 1.0,
-       s,  s, 0, ...particle.color, 1.0,
-      -s,  s, 0, ...particle.color, 1.0
+      -s, -s, 0, ...particle.color,
+       s, -s, 0, ...particle.color,
+       s,  s, 0, ...particle.color,
+      -s, -s, 0, ...particle.color,
+       s,  s, 0, ...particle.color,
+      -s,  s, 0, ...particle.color
     ];
-
     const vertexData = new Float32Array(vertices);
-
     particle.vertexBuffer = this.device.createBuffer({
       size: vertexData.byteLength,
       usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST
@@ -60,18 +58,14 @@ export class ParticleSystem {
 
   update(deltaTime) {
     for (let i = this.particles.length - 1; i >= 0; i--) {
-      const particle = this.particles[i];
-
-      particle.position[0] += particle.velocity[0] * deltaTime;
-      particle.position[1] += particle.velocity[1] * deltaTime;
-      particle.position[2] += particle.velocity[2] * deltaTime;
-
-      particle.velocity[1] -= 2 * deltaTime;
-
-      particle.life -= deltaTime * 0.8;
-
-      if (particle.life <= 0) {
-        if (particle.vertexBuffer) particle.vertexBuffer.destroy();
+      const p = this.particles[i];
+      p.position[0] += p.velocity[0] * deltaTime;
+      p.position[1] += p.velocity[1] * deltaTime;
+      p.position[2] += p.velocity[2] * deltaTime;
+      p.velocity[1] -= 2 * deltaTime;
+      p.life -= deltaTime * 1.5;
+      if (p.life <= 0) {
+        if (p.vertexBuffer) p.vertexBuffer.destroy();
         this.particles.splice(i, 1);
       }
     }

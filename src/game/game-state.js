@@ -16,17 +16,8 @@ export class GameState {
   addScore(points) {
     this.score += points;
     this.shapesDestroyed++;
-
-    if (this.shapesDestroyed % 10 === 0) {
+    if (this.shapesDestroyed > 0 && this.shapesDestroyed % 10 === 0) {
       this.wave++;
     }
-  }
-
-  getSpawnRate() {
-    return Math.max(0.5, 2.0 - (this.wave * 0.1));
-  }
-
-  getShapeSpeed() {
-    return 1.0 + (this.wave * 0.1);
   }
 }

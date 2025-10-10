@@ -11,26 +11,28 @@ export class ShapeSpawner {
     this.shapes.forEach(shape => {
       shape.vertexBuffer?.destroy();
       shape.indexBuffer?.destroy();
+      shape.uniformBuffer?.destroy(); // Clean up uniform buffer
     });
     this.shapes = [];
     this.spawnTimer = 0;
   }
 
   update(deltaTime, wave) {
+    // Handle spawning new shapes
     this.spawnTimer += deltaTime;
     const spawnRate = Math.max(0.5, 2.0 - (wave * 0.1));
     if (this.spawnTimer >= spawnRate) {
       this.spawnTimer = 0;
       this.spawnRandomShape(wave);
     }
-    
-    // FIX: ONLY filter out destroyed shapes, don't modify active shapes
-    // Process removals at the end to avoid mid-iteration issues
+
+    // Handle removing destroyed shapes
     for (let i = this.shapes.length - 1; i >= 0; i--) {
       if (this.shapes[i].toBeRemoved) {
         const shape = this.shapes[i];
         shape.vertexBuffer?.destroy();
         shape.indexBuffer?.destroy();
+        shape.uniformBuffer?.destroy(); // Clean up uniform buffer
         this.shapes.splice(i, 1);
       }
     }
@@ -38,7 +40,8 @@ export class ShapeSpawner {
 
   spawnRandomShape(wave) {
     const type = this.shapeTypes[Math.floor(Math.random() * this.shapeTypes.length)];
-    let x, y, z = -15;
+    // This line ensures the z-axis position is always -10 for every new shape.
+    let x, y, z = -10; 
     let positionIsValid = false;
     const maxAttempts = 10;
     const minDistance = 1.5;
@@ -59,19 +62,19 @@ export class ShapeSpawner {
     if (!positionIsValid) return;
 
     const velocity = 1.0 + (wave * 0.1);
-    const shape = { 
-        type, 
-        position: [x, y, z], 
+    const shape = {
+        type,
+        position: [x, y, z],
         rotationX: 0,
         rotationY: 0,
-        velocity, 
+        velocity,
         color: this.getShapeColor(type),
         toBeRemoved: false
     };
     this.createShapeGeometry(shape);
     this.shapes.push(shape);
   }
-  
+
   getShapeColor(type) {
     switch(type) {
       case 'cube': return [0.2, 0.6, 1.0];
@@ -98,6 +101,20 @@ export class ShapeSpawner {
     shape.indexBuffer = this.device.createBuffer({ size: indexData.byteLength, usage: GPUBufferUsage.INDEX | GPUBufferUsage.COPY_DST });
     this.device.queue.writeBuffer(shape.indexBuffer, 0, indexData);
     shape.indexCount = indices.length;
+
+    // FIX: Create dedicated uniform buffer and bind group for each shape
+    shape.uniformBuffer = this.device.createBuffer({
+      size: 96, // 16*4 (mat4) + 4*4 (vec3 + padding) + 4 (f32) + 4 (f32) -> 96 bytes total
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    shape.bindGroup = this.device.createBindGroup({
+      layout: this.renderer.shapeBindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.renderer.cameraUniformBuffer } },
+        { binding: 1, resource: { buffer: shape.uniformBuffer } },
+      ],
+    });
   }
 
   createCube() {
@@ -116,7 +133,7 @@ export class ShapeSpawner {
     ];
     return { vertices, indices };
   }
-  
+
   createPyramid() {
     const s = 0.5, h = 0.5;
     const n = Math.sqrt(h*h + s*s);
@@ -155,7 +172,7 @@ export class ShapeSpawner {
       }
       return { vertices, indices };
   }
-  
+
   createTorus() {
       const vertices = [], indices = [];
       const radius = 0.4, tube = 0.15;
@@ -181,15 +198,6 @@ export class ShapeSpawner {
         }
       }
       return { vertices, indices };
-  }
-
-  removeShape(shape) {
-    const index = this.shapes.indexOf(shape);
-    if (index > -1) {
-      shape.vertexBuffer?.destroy();
-      shape.indexBuffer?.destroy();
-      this.shapes.splice(index, 1);
-    }
   }
 
   getShapes() {
