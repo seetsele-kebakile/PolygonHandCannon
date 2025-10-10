@@ -139,11 +139,11 @@ class PolygonHandCannon {
         shape.rotationX += deltaTime * 0.5;
         shape.rotationY += deltaTime * 0.3;
         
-        // Threat calculation for the new coordinate space (z=-10 to z=-5)
-        shape.threat = Math.max(0, Math.min(1, (shape.position[2] + 10) / 5));
+        // Threat calculation for the new coordinate space (z=-10 to z=4.5)
+        shape.threat = Math.max(0, Math.min(1, (shape.position[2] + 10) / 14.5));
         
-        // Game over check for the new coordinate space
-        if (shape.position[2] > -5) {
+        // Game over check, now much closer to the camera
+        if (shape.position[2] > 4.5) {
             this.gameOver();
             break;
         }
