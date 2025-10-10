@@ -21,7 +21,8 @@
 
     canvas {
       width: 100vw;
-      height: 100vh;
+      /* Use dvh to account for mobile browser UI (address bars, etc.) */
+      height: 100dvh;
       display: block;
     }
 
@@ -37,8 +38,9 @@
 
     .crosshair {
       position: absolute;
-      width: 50px;
-      height: 50px;
+      /* Use clamp() and vmin for responsive sizing */
+      width: clamp(40px, 8vmin, 60px);
+      height: clamp(40px, 8vmin, 60px);
       transform: translate(-50%, -50%);
       pointer-events: none;
       transition: all 0.05s ease-out;
@@ -57,8 +59,8 @@
     .crosshair::after {
       content: '';
       position: absolute;
-      width: 10px;
-      height: 10px;
+      width: 20%;
+      height: 20%;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
@@ -88,7 +90,8 @@
 
     .hand-indicator {
       position: absolute;
-      font-size: 40px;
+      /* Responsive font size */
+      font-size: clamp(30px, 6vmin, 50px);
       pointer-events: none;
       filter: drop-shadow(0 0 10px rgba(0, 255, 0, 0.8));
       transition: all 0.05s ease-out;
@@ -96,15 +99,16 @@
 
     .hud {
       position: absolute;
-      top: 20px;
-      left: 20px;
+      top: 2vmin;
+      left: 2vmin;
       font-family: 'Courier New', monospace;
-      font-size: 24px;
+      /* Responsive font size */
+      font-size: clamp(14px, 2.5vmin, 24px);
       text-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
     }
 
     .hud-item {
-      margin: 10px 0;
+      margin: 1vmin 0;
       color: #0f0;
     }
 
@@ -120,49 +124,51 @@
       max-width: 300px;
     }
 
-    .start-screen {
+    .start-screen, .game-over {
       position: absolute;
       top: 50%;
       left: 50%;
       transform: translate(-50%, -50%);
       text-align: center;
       background: rgba(0, 0, 0, 0.9);
-      padding: 40px;
+      padding: clamp(20px, 5vmin, 50px);
       border: 3px solid #0f0;
       border-radius: 15px;
-      max-width: 600px;
+      /* Ensure it doesn't exceed screen width on mobile */
+      width: min(90vw, 600px);
+    }
+
+    .game-over {
+      border-color: #f00;
+      display: none;
     }
 
     .start-screen h1 {
-      font-size: 48px;
-      margin-bottom: 20px;
+      /* Responsive font size */
+      font-size: clamp(28px, 8vmin, 52px);
+      margin-bottom: 2vmin;
       color: #0f0;
       text-shadow: 0 0 20px rgba(0, 255, 0, 0.8);
     }
-
-    .start-screen p {
-      margin: 15px 0;
+    
+    .start-screen p, .start-screen li {
+      font-size: clamp(12px, 2vmin, 16px);
       line-height: 1.6;
       color: #ccc;
     }
 
     .start-screen ul {
       text-align: left;
-      margin: 20px auto;
+      margin: 3vmin auto;
       max-width: 450px;
     }
-
-    .start-screen li {
-      margin: 10px 0;
-      color: #ccc;
-    }
-
-    .start-screen .instruction-highlight {
+    
+    .start-screen .instruction-highlight, .game-over .instruction-highlight {
       color: #ff0;
       font-weight: bold;
-      font-size: 18px;
-      margin-top: 20px;
-      padding: 15px;
+      font-size: clamp(14px, 2.5vmin, 18px);
+      margin-top: 3vmin;
+      padding: 2.5vmin;
       background: rgba(255, 255, 0, 0.1);
       border: 2px solid rgba(255, 255, 0, 0.3);
       border-radius: 8px;
@@ -174,10 +180,11 @@
       50% { box-shadow: 0 0 20px rgba(255, 255, 0, 0.6); }
     }
 
-    .start-btn {
-      margin-top: 30px;
-      padding: 15px 40px;
-      font-size: 20px;
+    .start-btn, .restart-btn {
+      margin-top: 4vmin;
+      /* Responsive padding and font size */
+      padding: clamp(10px, 2vmin, 18px) clamp(25px, 5vmin, 45px);
+      font-size: clamp(16px, 3vmin, 22px);
       background: #0f0;
       color: #000;
       border: none;
@@ -187,14 +194,14 @@
       transition: all 0.3s;
       pointer-events: auto;
     }
-
-    .start-btn:hover {
+    
+    .start-btn:hover, .restart-btn:hover {
       background: #0c0;
       transform: scale(1.05);
       box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
     }
 
-    .start-btn.targeted {
+    .start-btn.targeted, .restart-btn.targeted {
       background: #ff0;
       color: #000;
       transform: scale(1.15);
@@ -207,28 +214,15 @@
       50% { transform: scale(1.2); }
     }
 
-    .start-btn.targeted::before {
+    .start-btn.targeted::before, .restart-btn.targeted::before {
       content: '🎯';
     }
 
-    .start-btn.targeted::after {
+    .start-btn.targeted::after, .restart-btn.targeted::after {
       content: ' - SHOOT!';
-      font-size: 16px;
+      font-size: 0.8em;
       display: block;
       margin-top: 5px;
-    }
-
-    .game-over {
-      position: absolute;
-      top: 50%;
-      left: 50%;
-      transform: translate(-50%, -50%);
-      text-align: center;
-      background: rgba(0, 0, 0, 0.95);
-      padding: 50px;
-      border: 3px solid #f00;
-      border-radius: 15px;
-      display: none;
     }
 
     .game-over.show {
@@ -242,58 +236,17 @@
     }
 
     .game-over h2 {
-      font-size: 60px;
+      font-size: clamp(32px, 10vmin, 64px);
       color: #f00;
-      margin-bottom: 20px;
+      margin-bottom: 2vmin;
       text-shadow: 0 0 30px rgba(255, 0, 0, 0.8);
     }
 
     .game-over .final-score {
-      font-size: 36px;
+      font-size: clamp(24px, 5vmin, 36px);
       color: #fff;
-      margin: 20px 0;
+      margin: 3vmin 0;
     }
-
-    .restart-btn {
-      margin-top: 20px;
-      padding: 15px 40px;
-      font-size: 18px;
-      background: #0f0;
-      color: #000;
-      border: none;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: bold;
-      pointer-events: auto;
-      transition: all 0.3s;
-    }
-
-    .restart-btn:hover {
-      background: #0c0;
-      transform: scale(1.05);
-      box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
-    }
-
-    .restart-btn.targeted {
-      background: #ff0;
-      color: #000;
-      transform: scale(1.15);
-      box-shadow: 0 0 30px rgba(255, 255, 0, 0.8);
-      animation: targetedButton 0.5s ease-in-out infinite;
-    }
-
-    .restart-btn.targeted::before {
-      content: '🎯';
-    }
-
-    .restart-btn.targeted::after {
-      content: ' - SHOOT!';
-      font-size: 14px;
-      display: block;
-      margin-top: 5px;
-    }
-
-    /* The voice-feedback class has been removed */
 
     .hand-status {
       position: absolute;
