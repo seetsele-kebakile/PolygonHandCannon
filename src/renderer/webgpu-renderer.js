@@ -14,9 +14,7 @@ export class WebGPURenderer {
     this.particlePipeline = null;
     this.depthTexture = null;
     this.cameraUniformBuffer = null;
-    this.particleUniformBuffer = null;
-    this.particleBindGroup = null;
-    this.shapeBindGroupLayout = null; // Exposed for the spawner
+    this.genericBindGroupLayout = null; // Renamed for clarity
     this.viewMatrix = mat4.create();
     this.projectionMatrix = mat4.create();
   }
@@ -38,6 +36,7 @@ export class WebGPURenderer {
   }
 
   createDepthTexture() {
+    // FIX: The assignment 'this.depthTexture =' was missing here.
     this.depthTexture = this.device.createTexture({
       size: [this.canvas.width, this.canvas.height],
       format: 'depth24plus',
@@ -47,20 +46,16 @@ export class WebGPURenderer {
 
   createUniformBuffers() {
     this.cameraUniformBuffer = this.device.createBuffer({ size: 64, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
-    this.particleUniformBuffer = this.device.createBuffer({ size: 80, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
   }
 
   createPipelines() {
-    this.shapeBindGroupLayout = this.device.createBindGroupLayout({
+    this.genericBindGroupLayout = this.device.createBindGroupLayout({
       entries: [
         { binding: 0, visibility: GPUShaderStage.VERTEX, buffer: { type: 'uniform' } },
         { binding: 1, visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } }
       ]
     });
-    const pipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [this.shapeBindGroupLayout] });
-
-    // Particle bind group still uses the same layout structure
-    this.particleBindGroup = this.device.createBindGroup({ layout: this.shapeBindGroupLayout, entries: [{ binding: 0, resource: { buffer: this.cameraUniformBuffer } }, { binding: 1, resource: { buffer: this.particleUniformBuffer } }] });
+    const pipelineLayout = this.device.createPipelineLayout({ bindGroupLayouts: [this.genericBindGroupLayout] });
 
     this.shapePipeline = this.device.createRenderPipeline({
       layout: pipelineLayout,
@@ -86,8 +81,28 @@ export class WebGPURenderer {
 
     this.particlePipeline = this.device.createRenderPipeline({
         layout: pipelineLayout,
-        vertex: { module: this.device.createShaderModule({ code: particleVertexShader }), entryPoint: 'main', buffers: [{ arrayStride: 24, attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }, { shaderLocation: 1, offset: 12, format: 'float32x3' }] }] },
-        fragment: { module: this.device.createShaderModule({ code: particleFragmentShader }), entryPoint: 'main', targets: [{ format: this.format, blend: { color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' }, alpha: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' } } }] },
+        vertex: { 
+            module: this.device.createShaderModule({ code: particleVertexShader }), 
+            entryPoint: 'main', 
+            buffers: [{ 
+                arrayStride: 24,
+                attributes: [
+                    { shaderLocation: 0, offset: 0, format: 'float32x3' }, // Position
+                    { shaderLocation: 1, offset: 12, format: 'float32x3' } // Color
+                ] 
+            }] 
+        },
+        fragment: { 
+            module: this.device.createShaderModule({ code: particleFragmentShader }), 
+            entryPoint: 'main', 
+            targets: [{ 
+                format: this.format, 
+                blend: { 
+                    color: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' }, 
+                    alpha: { srcFactor: 'src-alpha', dstFactor: 'one', operation: 'add' } 
+                } 
+            }] 
+        },
         primitive: { topology: 'triangle-list' },
         depthStencil: { format: 'depth24plus', depthWriteEnabled: false, depthCompare: 'less' }
       });
@@ -114,7 +129,6 @@ export class WebGPURenderer {
     // Render Particles
     if (particles && particles.length > 0) {
       renderPass.setPipeline(this.particlePipeline);
-      renderPass.setBindGroup(0, this.particleBindGroup);
       particles.forEach(particle => this.renderParticle(renderPass, particle));
     }
     renderPass.end();
@@ -137,10 +151,8 @@ export class WebGPURenderer {
     shapeData[20] = Math.max(0, Math.min(1, shape.threat !== undefined ? shape.threat : 0));
     shapeData[21] = isTargeted ? 1.0 : 0.0;
     
-    // Write to this shape's specific uniform buffer
     this.device.queue.writeBuffer(shape.uniformBuffer, 0, shapeData);
     
-    // Set this shape's specific bind group
     renderPass.setBindGroup(0, shape.bindGroup);
     renderPass.setVertexBuffer(0, shape.vertexBuffer);
     renderPass.setIndexBuffer(shape.indexBuffer, 'uint16');
@@ -148,12 +160,18 @@ export class WebGPURenderer {
   }
 
   renderParticle(renderPass, particle) {
+    if (!particle.vertexBuffer || !particle.uniformBuffer || !particle.bindGroup) {
+        return;
+    }
     const particleData = new Float32Array(20);
     const modelMatrix = mat4.create();
     mat4.translate(modelMatrix, modelMatrix, particle.position);
     particleData.set(modelMatrix, 0);
     particleData[16] = particle.life;
-    this.device.queue.writeBuffer(this.particleUniformBuffer, 0, particleData);
+    
+    this.device.queue.writeBuffer(particle.uniformBuffer, 0, particleData);
+
+    renderPass.setBindGroup(0, particle.bindGroup);
     renderPass.setVertexBuffer(0, particle.vertexBuffer);
     renderPass.draw(6);
   }
@@ -187,6 +205,5 @@ export class WebGPURenderer {
   destroy() {
     this.depthTexture?.destroy();
     this.cameraUniformBuffer?.destroy();
-    this.particleUniformBuffer?.destroy();
   }
 }

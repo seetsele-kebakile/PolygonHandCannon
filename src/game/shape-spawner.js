@@ -102,14 +102,14 @@ export class ShapeSpawner {
     this.device.queue.writeBuffer(shape.indexBuffer, 0, indexData);
     shape.indexCount = indices.length;
 
-    // FIX: Create dedicated uniform buffer and bind group for each shape
     shape.uniformBuffer = this.device.createBuffer({
-      size: 96, // 16*4 (mat4) + 4*4 (vec3 + padding) + 4 (f32) + 4 (f32) -> 96 bytes total
+      size: 96,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
     shape.bindGroup = this.device.createBindGroup({
-      layout: this.renderer.shapeBindGroupLayout,
+      // Corrected the property name here
+      layout: this.renderer.genericBindGroupLayout,
       entries: [
         { binding: 0, resource: { buffer: this.renderer.cameraUniformBuffer } },
         { binding: 1, resource: { buffer: shape.uniformBuffer } },
