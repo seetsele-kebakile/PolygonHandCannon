@@ -18,8 +18,9 @@ class PolygonHandCannon {
     this.isInitialized = false;
     this.lastTime = performance.now();
     this.crosshair = document.getElementById('crosshair');
-    // FIX: Select the hand indicator element
-    this.handIndicator = document.getElementById('handIndicator'); 
+    this.handIndicator = document.getElementById('handIndicator');
+    // FIX: Select the hand status UI element
+    this.handStatus = document.getElementById('handStatus');
     this.currentGameState = 'initializing';
     this.canShoot = true;
     this.shootPressed = false;
@@ -115,9 +116,20 @@ class PolygonHandCannon {
     if (handPos) {
       this.crosshair.style.left = `${handPos.x}px`;
       this.crosshair.style.top = `${handPos.y}px`;
-      // FIX: Update the hand indicator's position along with the crosshair
       this.handIndicator.style.left = `${handPos.x}px`;
       this.handIndicator.style.top = `${handPos.y}px`;
+    }
+
+    // FIX: Add logic to update the hand status indicator
+    const isHandDetected = this.handTracker.isHandDetected();
+    if (isHandDetected) {
+        this.handStatus.textContent = 'HAND DETECTED';
+        this.handStatus.classList.add('detected');
+        this.handStatus.classList.remove('not-detected');
+    } else {
+        this.handStatus.textContent = 'HAND NOT DETECTED';
+        this.handStatus.classList.add('not-detected');
+        this.handStatus.classList.remove('detected');
     }
     
     this.crosshair.classList.toggle('targeting', !!this.targetedShape);
