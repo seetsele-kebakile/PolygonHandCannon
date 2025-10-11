@@ -18,12 +18,15 @@ export class ShapeSpawner {
     this.spawnTimer = 0;
   }
 
-  update(deltaTime, wave) {
+  update(deltaTime, gameTime) {
     this.spawnTimer += deltaTime;
-    const spawnRate = Math.max(0.5, 2.0 - (wave * 0.1));
+    // NEW: Spawn rate now depends on gameTime, not wave number.
+    // It starts at 2 seconds and decreases to a minimum of 0.4 seconds.
+    const spawnRate = Math.max(0.4, 2.0 - (gameTime * 0.02));
+    
     if (this.spawnTimer >= spawnRate) {
       this.spawnTimer = 0;
-      this.spawnRandomShape(wave);
+      this.spawnRandomShape(gameTime);
     }
 
     for (let i = this.shapes.length - 1; i >= 0; i--) {
@@ -37,14 +40,13 @@ export class ShapeSpawner {
     }
   }
 
-  spawnRandomShape(wave) {
+  spawnRandomShape(gameTime) {
     const type = this.shapeTypes[Math.floor(Math.random() * this.shapeTypes.length)];
     const spawnZ = -10;
     
     const aspect = this.canvas.width / this.canvas.height;
     const fovInRadians = 60 * Math.PI / 180;
     
-    // Calculate spawn area dimensions
     const spawnH = 2 * Math.tan(fovInRadians / 2) * Math.abs(spawnZ);
     const spawnW = spawnH * aspect;
     const shapeRadius = 0.5; 
@@ -54,35 +56,31 @@ export class ShapeSpawner {
     let spawnX = (Math.random() - 0.5) * spawnWidth;
     let spawnY = (Math.random() - 0.5) * spawnHeight;
 
-    // --- NEW: Calculate a random target point on the screen plane ---
-    const targetZ = 4.5; // The game-over plane
+    const targetZ = 4.5;
     const targetH = 2 * Math.tan(fovInRadians / 2) * Math.abs(targetZ);
     const targetW = targetH * aspect;
     const targetX = (Math.random() - 0.5) * targetW;
     const targetY = (Math.random() - 0.5) * targetH;
 
-    // Calculate direction vector from spawn to target
     const dirX = targetX - spawnX;
     const dirY = targetY - spawnY;
     const dirZ = targetZ - spawnZ;
     
-    // Normalize the direction vector
     const len = Math.sqrt(dirX*dirX + dirY*dirY + dirZ*dirZ);
     const normX = dirX / len;
     const normY = dirY / len;
     const normZ = dirZ / len;
 
-    // Set the speed and calculate the final velocity vector
-    const speed = 2.0 + (wave * 0.15); // Slightly increased base speed for more dynamic feel
+    // NEW: Shape speed now depends on gameTime, not wave number.
+    const speed = 2.0 + (gameTime * 0.03);
     const velocity = [normX * speed, normY * speed, normZ * speed];
-    // --- END NEW ---
 
     const shape = {
         type,
         position: [spawnX, spawnY, spawnZ],
         rotationX: 0,
         rotationY: 0,
-        velocity, // Use the new 3D velocity vector
+        velocity,
         color: this.getShapeColor(type),
         toBeRemoved: false
     };

@@ -21,6 +21,7 @@ class PolygonHandCannon {
     this.handIndicator = document.getElementById('handIndicator');
     this.handStatus = document.getElementById('handStatus');
     this.currentGameState = 'initializing';
+    this.gameTime = 0; // Tracks total elapsed time for difficulty scaling
     this.canShoot = true;
     this.shootPressed = false;
     this.targetedShape = null;
@@ -85,6 +86,7 @@ class PolygonHandCannon {
     this.gameState.reset();
     this.shapeSpawner.reset();
     this.particleSystem.reset();
+    this.gameTime = 0; // Reset game timer
     
     if (this.music.paused) {
         this.music.play();
@@ -145,7 +147,8 @@ class PolygonHandCannon {
   }
   
   updateGame(deltaTime, handPos) {
-    this.shapeSpawner.update(deltaTime, this.gameState.wave);
+    this.gameTime += deltaTime; // Increment game time
+    this.shapeSpawner.update(deltaTime, this.gameTime); // Pass game time to spawner
     this.particleSystem.update(deltaTime);
 
     const shapes = this.shapeSpawner.getShapes();
@@ -166,11 +169,9 @@ class PolygonHandCannon {
     for (const shape of shapes) {
         if (shape.toBeRemoved) continue;
 
-        // --- NEW: Update position using the 3D velocity vector ---
         shape.position[0] += shape.velocity[0] * deltaTime;
         shape.position[1] += shape.velocity[1] * deltaTime;
         shape.position[2] += shape.velocity[2] * deltaTime;
-        // --- END NEW ---
 
         shape.rotationX += deltaTime * 0.5;
         shape.rotationY += deltaTime * 0.3;
