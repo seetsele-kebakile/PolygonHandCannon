@@ -16,14 +16,26 @@
       background: #000;
       color: #fff;
       overflow: hidden;
+      /* Default cursor for menus */
+      cursor: default; 
+    }
+
+    /* Hide cursor when game is active */
+    body.game-playing {
       cursor: none;
     }
 
     canvas {
       width: 100vw;
-      /* Use dvh to account for mobile browser UI (address bars, etc.) */
       height: 100dvh;
       display: block;
+      /* Default cursor for the canvas area */
+      cursor: crosshair;
+    }
+    
+    /* FIX: More specific rule to ensure cursor is hidden over the canvas during gameplay */
+    body.game-playing canvas {
+        cursor: none;
     }
 
     .ui-overlay {
@@ -38,7 +50,6 @@
 
     .crosshair {
       position: absolute;
-      /* Use clamp() and vmin for responsive sizing */
       width: clamp(40px, 8vmin, 60px);
       height: clamp(40px, 8vmin, 60px);
       transform: translate(-50%, -50%);
@@ -90,7 +101,6 @@
 
     .hand-indicator {
       position: absolute;
-      /* Responsive font size */
       font-size: clamp(30px, 6vmin, 50px);
       pointer-events: none;
       filter: drop-shadow(0 0 10px rgba(0, 255, 0, 0.8));
@@ -102,7 +112,6 @@
       top: 2vmin;
       left: 2vmin;
       font-family: 'Courier New', monospace;
-      /* Responsive font size */
       font-size: clamp(14px, 2.5vmin, 24px);
       text-shadow: 0 0 10px rgba(0, 255, 0, 0.8);
     }
@@ -134,7 +143,6 @@
       padding: clamp(20px, 5vmin, 50px);
       border: 3px solid #0f0;
       border-radius: 15px;
-      /* Ensure it doesn't exceed screen width on mobile */
       width: min(90vw, 600px);
     }
 
@@ -144,7 +152,6 @@
     }
 
     .start-screen h1 {
-      /* Responsive font size */
       font-size: clamp(28px, 8vmin, 52px);
       margin-bottom: 2vmin;
       color: #0f0;
@@ -172,17 +179,10 @@
       background: rgba(255, 255, 0, 0.1);
       border: 2px solid rgba(255, 255, 0, 0.3);
       border-radius: 8px;
-      animation: glow 2s ease-in-out infinite;
-    }
-
-    @keyframes glow {
-      0%, 100% { box-shadow: 0 0 5px rgba(255, 255, 0, 0.3); }
-      50% { box-shadow: 0 0 20px rgba(255, 255, 0, 0.6); }
     }
 
     .start-btn, .restart-btn {
       margin-top: 4vmin;
-      /* Responsive padding and font size */
       padding: clamp(10px, 2vmin, 18px) clamp(25px, 5vmin, 45px);
       font-size: clamp(16px, 3vmin, 22px);
       background: #0f0;
@@ -200,30 +200,8 @@
       transform: scale(1.05);
       box-shadow: 0 0 20px rgba(0, 255, 0, 0.6);
     }
-
-    .start-btn.targeted, .restart-btn.targeted {
-      background: #ff0;
-      color: #000;
-      transform: scale(1.15);
-      box-shadow: 0 0 30px rgba(255, 255, 0, 0.8);
-      animation: targetedButton 0.5s ease-in-out infinite;
-    }
-
-    @keyframes targetedButton {
-      0%, 100% { transform: scale(1.15); }
-      50% { transform: scale(1.2); }
-    }
-
-    .start-btn.targeted::before, .restart-btn.targeted::before {
-      content: '🎯';
-    }
-
-    .start-btn.targeted::after, .restart-btn.targeted::after {
-      content: ' - SHOOT!';
-      font-size: 0.8em;
-      display: block;
-      margin-top: 5px;
-    }
+    
+    /* Removed obsolete .targeted class styles as they are no longer used */
 
     .game-over.show {
       display: block;
@@ -274,7 +252,7 @@
       display: none;
     }
   </style>
-  <script type="module" crossorigin src="/PolygonHandCannon/assets/index-BUi24fXR.js"></script>
+  <script type="module" crossorigin src="/PolygonHandCannon/assets/index-aEjNX8Pa.js"></script>
 </head>
 <body>
   <canvas id="gpuCanvas"></canvas>
@@ -295,23 +273,23 @@
 
     <div class="start-screen" id="startScreen">
       <h1>Polygon Hand Cannon</h1>
-      <h3 style="color: #0f0; margin-bottom: 15px;">Gesture Control Edition</h3>
-      <p>A first-person rail shooter controlled entirely by hand gestures!</p>
+      <h3 style="color: #0f0; margin-bottom: 15px;">Hybrid Control Edition</h3>
+      <p>A first-person rail shooter using hand tracking to aim.</p>
       <ul>
-        <li><strong>AIM:</strong> Point your index finger to aim the crosshair</li>
-        <li><strong>FIRE:</strong> Make a "finger gun" gesture to shoot shapes</li>
-        <li><strong>START/SELECT:</strong> Aim at a button and make the shooting gesture</li>
+        <li><strong>AIM:</strong> Point your index finger at the screen to aim</li>
+        <li><strong>FIRE:</strong> Click the mouse, tap the screen, or press any key</li>
+        <li><strong>START/SELECT:</strong> Click the buttons with your mouse</li>
         <li><strong>SURVIVE:</strong> Destroy shapes before they reach you</li>
       </ul>
       
       <div class="instruction-highlight">
-         👉 Point at the START button and make a shooting gesture to begin! 👈
+         👉 Click the START button to begin! 👈
       </div>
 
       <button class="start-btn" id="startBtn">START GAME</button>
 
       <p style="margin-top: 20px; font-size: 12px;">
-        Camera access is required<br>
+        Camera access is required for aiming.<br>
         Hold your hand in front of the camera to play.
       </p>
     </div>
@@ -321,7 +299,7 @@
       <div class="final-score">FINAL SCORE: <span id="finalScore">0</span></div>
       
       <div class="instruction-highlight">
-         👉 Aim at PLAY AGAIN and make a shooting gesture to restart! 👈
+         👉 Click PLAY AGAIN to restart! 👈
       </div>
       
       <button class="restart-btn" id="restartBtn">PLAY AGAIN</button>
@@ -329,8 +307,7 @@
 
     <div class="hand-status detected" id="handStatus">HAND DETECTED</div>
   </div>
-  
-    <audio id="background-music" loop src="/PolygonHandCannon/audio/bensound-sunsetreverie.mp3"></audio>
 
+  <audio id="background-music" loop src="/PolygonHandCannon/audio/bensound-sunsetreverie.mp3"></audio>
 </body>
 </html>
