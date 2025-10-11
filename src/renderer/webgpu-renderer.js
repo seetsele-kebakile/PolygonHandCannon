@@ -14,7 +14,7 @@ export class WebGPURenderer {
     this.particlePipeline = null;
     this.depthTexture = null;
     this.cameraUniformBuffer = null;
-    this.genericBindGroupLayout = null; // Renamed for clarity
+    this.genericBindGroupLayout = null;
     this.viewMatrix = mat4.create();
     this.projectionMatrix = mat4.create();
   }
@@ -31,12 +31,12 @@ export class WebGPURenderer {
     this.createDepthTexture();
     this.createUniformBuffers();
     this.createPipelines();
+    // Revert camera to its original position
     mat4.lookAt(this.viewMatrix, vec3.fromValues(0, 0, 5), vec3.fromValues(0, 0, 0), vec3.fromValues(0, 1, 0));
     window.addEventListener('resize', () => this.handleResize());
   }
 
   createDepthTexture() {
-    // FIX: The assignment 'this.depthTexture =' was missing here.
     this.depthTexture = this.device.createTexture({
       size: [this.canvas.width, this.canvas.height],
       format: 'depth24plus',
@@ -65,8 +65,8 @@ export class WebGPURenderer {
         buffers: [{
           arrayStride: 24,
           attributes: [
-            { shaderLocation: 0, offset: 0, format: 'float32x3' },  // Position
-            { shaderLocation: 1, offset: 12, format: 'float32x3' } // Normal
+            { shaderLocation: 0, offset: 0, format: 'float32x3' },
+            { shaderLocation: 1, offset: 12, format: 'float32x3' }
           ]
         }]
       },
@@ -87,8 +87,8 @@ export class WebGPURenderer {
             buffers: [{ 
                 arrayStride: 24,
                 attributes: [
-                    { shaderLocation: 0, offset: 0, format: 'float32x3' }, // Position
-                    { shaderLocation: 1, offset: 12, format: 'float32x3' } // Color
+                    { shaderLocation: 0, offset: 0, format: 'float32x3' },
+                    { shaderLocation: 1, offset: 12, format: 'float32x3' }
                 ] 
             }] 
         },
@@ -110,7 +110,10 @@ export class WebGPURenderer {
 
   render({ shapes, particles, targetedShape }) {
     const aspect = this.canvas.width / this.canvas.height;
+    
+    // Revert to perspective projection
     mat4.perspective(this.projectionMatrix, 60 * Math.PI / 180, aspect, 0.1, 100);
+
     const vpMatrix = mat4.multiply(mat4.create(), this.projectionMatrix, this.viewMatrix);
     this.device.queue.writeBuffer(this.cameraUniformBuffer, 0, vpMatrix);
 
@@ -121,12 +124,10 @@ export class WebGPURenderer {
       depthStencilAttachment: { view: this.depthTexture.createView(), depthClearValue: 1.0, depthLoadOp: 'clear', depthStoreOp: 'store' }
     });
 
-    // Render Shapes
     renderPass.setPipeline(this.shapePipeline);
     const validShapes = shapes.filter(s => s && s.vertexBuffer && s.indexBuffer && !s.toBeRemoved);
     validShapes.forEach(shape => this.renderShape(renderPass, shape, shape === targetedShape));
 
-    // Render Particles
     if (particles && particles.length > 0) {
       renderPass.setPipeline(this.particlePipeline);
       particles.forEach(particle => this.renderParticle(renderPass, particle));
@@ -136,9 +137,7 @@ export class WebGPURenderer {
   }
 
   renderShape(renderPass, shape, isTargeted) {
-    if (!shape.vertexBuffer || !shape.indexBuffer || !shape.indexCount || !shape.uniformBuffer || !shape.bindGroup) {
-      return;
-    }
+    if (!shape.vertexBuffer || !shape.indexBuffer || !shape.indexCount || !shape.uniformBuffer || !shape.bindGroup) return;
 
     const shapeData = new Float32Array(24);
     const modelMatrix = mat4.create();
@@ -160,9 +159,8 @@ export class WebGPURenderer {
   }
 
   renderParticle(renderPass, particle) {
-    if (!particle.vertexBuffer || !particle.uniformBuffer || !particle.bindGroup) {
-        return;
-    }
+    if (!particle.vertexBuffer || !particle.uniformBuffer || !particle.bindGroup) return;
+
     const particleData = new Float32Array(20);
     const modelMatrix = mat4.create();
     mat4.translate(modelMatrix, modelMatrix, particle.position);
@@ -180,9 +178,7 @@ export class WebGPURenderer {
     const vpMatrix = mat4.multiply(mat4.create(), this.projectionMatrix, this.viewMatrix);
     const clipPos = vec4.transformMat4(vec4.create(), vec4.fromValues(worldPos[0], worldPos[1], worldPos[2], 1.0), vpMatrix);
 
-    if (clipPos[3] <= 0) {
-      return null;
-    }
+    if (clipPos[3] <= 0) return null;
 
     const ndcX = clipPos[0] / clipPos[3];
     const ndcY = clipPos[1] / clipPos[3];

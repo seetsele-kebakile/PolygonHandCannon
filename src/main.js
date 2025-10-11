@@ -35,12 +35,20 @@ class PolygonHandCannon {
       this.renderer = new WebGPURenderer(this.canvas);
       await this.renderer.init();
       this.gameState = new GameState();
-      this.shapeSpawner = new ShapeSpawner(this.renderer);
+      this.shapeSpawner = new ShapeSpawner(this.renderer); 
       this.particleSystem = new ParticleSystem(this.renderer);
       this.setupEventListeners();
       this.isInitialized = true;
       this.currentGameState = 'ready';
       document.getElementById('status').classList.add('hidden');
+
+      this.music.volume = 0.2;
+      try {
+        await this.music.play();
+      } catch (err) {
+        console.warn('Autoplay was blocked by the browser. Music will start on first user interaction.');
+      }
+
       requestAnimationFrame(() => this.gameLoop());
     } catch (error) {
       console.error('Initialization error:', error);
@@ -78,9 +86,7 @@ class PolygonHandCannon {
     this.shapeSpawner.reset();
     this.particleSystem.reset();
     
-    // Play music if it's not already playing
     if (this.music.paused) {
-        this.music.volume = 0.2;
         this.music.play();
     }
   }
@@ -90,7 +96,6 @@ class PolygonHandCannon {
     document.getElementById('gameOver').classList.remove('show');
     document.getElementById('startScreen').classList.remove('hidden');
     this.currentGameState = 'ready';
-    // Music pause logic is removed
   }
 
   gameLoop() {
@@ -160,7 +165,13 @@ class PolygonHandCannon {
 
     for (const shape of shapes) {
         if (shape.toBeRemoved) continue;
-        shape.position[2] += shape.velocity * deltaTime;
+
+        // --- NEW: Update position using the 3D velocity vector ---
+        shape.position[0] += shape.velocity[0] * deltaTime;
+        shape.position[1] += shape.velocity[1] * deltaTime;
+        shape.position[2] += shape.velocity[2] * deltaTime;
+        // --- END NEW ---
+
         shape.rotationX += deltaTime * 0.5;
         shape.rotationY += deltaTime * 0.3;
         
@@ -207,7 +218,6 @@ class PolygonHandCannon {
     this.currentGameState = 'gameOver';
     document.getElementById('finalScore').textContent = this.gameState.score;
     document.getElementById('gameOver').classList.add('show');
-    // Music pause logic is removed
   }
 }
 

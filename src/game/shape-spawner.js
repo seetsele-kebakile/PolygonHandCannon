@@ -2,6 +2,7 @@ export class ShapeSpawner {
   constructor(renderer) {
     this.renderer = renderer;
     this.device = renderer.device;
+    this.canvas = renderer.canvas; 
     this.shapes = [];
     this.spawnTimer = 0;
     this.shapeTypes = ['cube', 'sphere', 'torus', 'pyramid'];
@@ -11,14 +12,13 @@ export class ShapeSpawner {
     this.shapes.forEach(shape => {
       shape.vertexBuffer?.destroy();
       shape.indexBuffer?.destroy();
-      shape.uniformBuffer?.destroy(); // Clean up uniform buffer
+      shape.uniformBuffer?.destroy();
     });
     this.shapes = [];
     this.spawnTimer = 0;
   }
 
   update(deltaTime, wave) {
-    // Handle spawning new shapes
     this.spawnTimer += deltaTime;
     const spawnRate = Math.max(0.5, 2.0 - (wave * 0.1));
     if (this.spawnTimer >= spawnRate) {
@@ -26,13 +26,12 @@ export class ShapeSpawner {
       this.spawnRandomShape(wave);
     }
 
-    // Handle removing destroyed shapes
     for (let i = this.shapes.length - 1; i >= 0; i--) {
       if (this.shapes[i].toBeRemoved) {
         const shape = this.shapes[i];
         shape.vertexBuffer?.destroy();
         shape.indexBuffer?.destroy();
-        shape.uniformBuffer?.destroy(); // Clean up uniform buffer
+        shape.uniformBuffer?.destroy();
         this.shapes.splice(i, 1);
       }
     }
@@ -40,37 +39,54 @@ export class ShapeSpawner {
 
   spawnRandomShape(wave) {
     const type = this.shapeTypes[Math.floor(Math.random() * this.shapeTypes.length)];
-    // This line ensures the z-axis position is always -10 for every new shape.
-    let x, y, z = -10; 
-    let positionIsValid = false;
-    const maxAttempts = 10;
-    const minDistance = 1.5;
+    const spawnZ = -10;
+    
+    const aspect = this.canvas.width / this.canvas.height;
+    const fovInRadians = 60 * Math.PI / 180;
+    
+    // Calculate spawn area dimensions
+    const spawnH = 2 * Math.tan(fovInRadians / 2) * Math.abs(spawnZ);
+    const spawnW = spawnH * aspect;
+    const shapeRadius = 0.5; 
+    const spawnWidth = spawnW - (shapeRadius * 2);
+    const spawnHeight = spawnH - (shapeRadius * 2);
 
-    for (let i = 0; i < maxAttempts && !positionIsValid; i++) {
-        x = (Math.random() - 0.5) * 4;
-        y = (Math.random() - 0.5) * 3;
-        positionIsValid = true;
-        for (const existingShape of this.shapes) {
-            const dist = Math.hypot(x - existingShape.position[0], y - existingShape.position[1]);
-            if (dist < minDistance) {
-                positionIsValid = false;
-                break;
-            }
-        }
-    }
+    let spawnX = (Math.random() - 0.5) * spawnWidth;
+    let spawnY = (Math.random() - 0.5) * spawnHeight;
 
-    if (!positionIsValid) return;
+    // --- NEW: Calculate a random target point on the screen plane ---
+    const targetZ = 4.5; // The game-over plane
+    const targetH = 2 * Math.tan(fovInRadians / 2) * Math.abs(targetZ);
+    const targetW = targetH * aspect;
+    const targetX = (Math.random() - 0.5) * targetW;
+    const targetY = (Math.random() - 0.5) * targetH;
 
-    const velocity = 1.0 + (wave * 0.1);
+    // Calculate direction vector from spawn to target
+    const dirX = targetX - spawnX;
+    const dirY = targetY - spawnY;
+    const dirZ = targetZ - spawnZ;
+    
+    // Normalize the direction vector
+    const len = Math.sqrt(dirX*dirX + dirY*dirY + dirZ*dirZ);
+    const normX = dirX / len;
+    const normY = dirY / len;
+    const normZ = dirZ / len;
+
+    // Set the speed and calculate the final velocity vector
+    const speed = 2.0 + (wave * 0.15); // Slightly increased base speed for more dynamic feel
+    const velocity = [normX * speed, normY * speed, normZ * speed];
+    // --- END NEW ---
+
     const shape = {
         type,
-        position: [x, y, z],
+        position: [spawnX, spawnY, spawnZ],
         rotationX: 0,
         rotationY: 0,
-        velocity,
+        velocity, // Use the new 3D velocity vector
         color: this.getShapeColor(type),
         toBeRemoved: false
     };
+
     this.createShapeGeometry(shape);
     this.shapes.push(shape);
   }
@@ -108,7 +124,6 @@ export class ShapeSpawner {
     });
 
     shape.bindGroup = this.device.createBindGroup({
-      // Corrected the property name here
       layout: this.renderer.genericBindGroupLayout,
       entries: [
         { binding: 0, resource: { buffer: this.renderer.cameraUniformBuffer } },
@@ -119,18 +134,8 @@ export class ShapeSpawner {
 
   createCube() {
     const s = 0.5;
-    const vertices = [
-      -s,-s,s,0,0,1, s,-s,s,0,0,1, s,s,s,0,0,1, -s,s,s,0,0,1,
-      -s,-s,-s,0,0,-1, -s,s,-s,0,0,-1, s,s,-s,0,0,-1, s,-s,-s,0,0,-1,
-      -s,s,-s,0,1,0, -s,s,s,0,1,0, s,s,s,0,1,0, s,s,-s,0,1,0,
-      -s,-s,-s,0,-1,0, s,-s,-s,0,-1,0, s,-s,s,0,-1,0, -s,-s,s,0,-1,0,
-      s,-s,-s,1,0,0, s,s,-s,1,0,0, s,s,s,1,0,0, s,-s,s,1,0,0,
-      -s,-s,-s,-1,0,0, -s,-s,s,-1,0,0, -s,s,s,-1,0,0, -s,s,-s,-1,0,0,
-    ];
-    const indices = [
-      0,1,2, 0,2,3, 4,5,6, 4,6,7, 8,9,10, 8,10,11,
-      12,13,14, 12,14,15, 16,17,18, 16,18,19, 20,21,22, 20,22,23,
-    ];
+    const vertices = [ -s,-s,s,0,0,1, s,-s,s,0,0,1, s,s,s,0,0,1, -s,s,s,0,0,1, -s,-s,-s,0,0,-1, -s,s,-s,0,0,-1, s,s,-s,0,0,-1, s,-s,-s,0,0,-1, -s,s,-s,0,1,0, -s,s,s,0,1,0, s,s,s,0,1,0, s,s,-s,0,1,0, -s,-s,-s,0,-1,0, s,-s,-s,0,-1,0, s,-s,s,0,-1,0, -s,-s,s,0,-1,0, s,-s,-s,1,0,0, s,s,-s,1,0,0, s,s,s,1,0,0, s,-s,s,1,0,0, -s,-s,-s,-1,0,0, -s,-s,s,-1,0,0, -s,s,s,-1,0,0, -s,s,-s,-1,0,0, ];
+    const indices = [ 0,1,2, 0,2,3, 4,5,6, 4,6,7, 8,9,10, 8,10,11, 12,13,14, 12,14,15, 16,17,18, 16,18,19, 20,21,22, 20,22,23, ];
     return { vertices, indices };
   }
 
@@ -138,13 +143,7 @@ export class ShapeSpawner {
     const s = 0.5, h = 0.5;
     const n = Math.sqrt(h*h + s*s);
     const nxz = h/n, ny = s/n;
-    const vertices = [
-      -s,-h,-s,0,-1,0, s,-h,-s,0,-1,0, s,-h,s,0,-1,0, -s,-h,s,0,-1,0,
-      0,h,0,0,ny,nxz, -s,-h,s,0,ny,nxz, s,-h,s,0,ny,nxz,
-      0,h,0,0,ny,-nxz, s,-h,-s,0,ny,-nxz, -s,-h,-s,0,ny,-nxz,
-      0,h,0,nxz,ny,0, s,-h,s,nxz,ny,0, s,-h,-s,nxz,ny,0,
-      0,h,0,-nxz,ny,0, -s,-h,-s,-nxz,ny,0, -s,-h,s,-nxz,ny,0,
-    ];
+    const vertices = [ -s,-h,-s,0,-1,0, s,-h,-s,0,-1,0, s,-h,s,0,-1,0, -s,-h,s,0,-1,0, 0,h,0,0,ny,nxz, -s,-h,s,0,ny,nxz, s,-h,s,0,ny,nxz, 0,h,0,0,ny,-nxz, s,-h,-s,0,ny,-nxz, -s,-h,-s,0,ny,-nxz, 0,h,0,nxz,ny,0, s,-h,s,nxz,ny,0, s,-h,-s,nxz,ny,0, 0,h,0,-nxz,ny,0, -s,-h,-s,-nxz,ny,0, -s,-h,s,-nxz,ny,0, ];
     const indices = [ 0,1,2,0,2,3, 4,5,6, 7,8,9, 10,11,12, 13,14,15 ];
     return { vertices, indices };
   }
