@@ -19,7 +19,6 @@ class PolygonHandCannon {
     this.lastTime = performance.now();
     this.crosshair = document.getElementById('crosshair');
     this.handIndicator = document.getElementById('handIndicator');
-    // FIX: Select the hand status UI element
     this.handStatus = document.getElementById('handStatus');
     this.currentGameState = 'initializing';
     this.canShoot = true;
@@ -78,8 +77,12 @@ class PolygonHandCannon {
     this.gameState.reset();
     this.shapeSpawner.reset();
     this.particleSystem.reset();
-    this.music.volume = 0.2;
-    this.music.play();
+    
+    // Play music if it's not already playing
+    if (this.music.paused) {
+        this.music.volume = 0.2;
+        this.music.play();
+    }
   }
 
   restartGame() {
@@ -87,8 +90,7 @@ class PolygonHandCannon {
     document.getElementById('gameOver').classList.remove('show');
     document.getElementById('startScreen').classList.remove('hidden');
     this.currentGameState = 'ready';
-    this.music.pause();
-    this.music.currentTime = 0;
+    // Music pause logic is removed
   }
 
   gameLoop() {
@@ -120,7 +122,6 @@ class PolygonHandCannon {
       this.handIndicator.style.top = `${handPos.y}px`;
     }
 
-    // FIX: Add logic to update the hand status indicator
     const isHandDetected = this.handTracker.isHandDetected();
     if (isHandDetected) {
         this.handStatus.textContent = 'HAND DETECTED';
@@ -206,8 +207,7 @@ class PolygonHandCannon {
     this.currentGameState = 'gameOver';
     document.getElementById('finalScore').textContent = this.gameState.score;
     document.getElementById('gameOver').classList.add('show');
-    this.music.pause();
-    this.music.currentTime = 0;
+    // Music pause logic is removed
   }
 }
 
