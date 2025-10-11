@@ -160,20 +160,26 @@ class PolygonHandCannon {
 
   performRaycast(handPos, shapes) {
     if (!handPos) return null;
+
+    const HITBOX_RADIUS = 40; // Max distance in pixels to register a hit.
     let closestShape = null;
-    let minDistance = 100;
+    let closestDistance = HITBOX_RADIUS; // Start with the max allowed distance.
+
     for (const shape of shapes) {
       if (shape.toBeRemoved) continue;
       const projected = this.renderer.projectToScreen(shape.position);
       if (projected) {
         const distance = Math.hypot(projected.x - handPos.x, projected.y - handPos.y);
-        if (distance < minDistance) {
-          minDistance = distance;
+
+        // Check if the shape is within the hitbox AND closer than any other valid target.
+        if (distance < closestDistance) {
+          closestDistance = distance;
           closestShape = shape;
         }
       }
     }
-    return closestShape;
+    
+    return closestShape; // This will be null if no shape is within the HITBOX_RADIUS.
   }
 
   gameOver() {
