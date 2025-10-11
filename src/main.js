@@ -18,6 +18,8 @@ class PolygonHandCannon {
     this.isInitialized = false;
     this.lastTime = performance.now();
     this.crosshair = document.getElementById('crosshair');
+    // FIX: Select the hand indicator element
+    this.handIndicator = document.getElementById('handIndicator'); 
     this.currentGameState = 'initializing';
     this.canShoot = true;
     this.shootPressed = false;
@@ -69,7 +71,7 @@ class PolygonHandCannon {
 
   startGame() {
     if (this.currentGameState !== 'ready') return;
-    document.body.classList.add('game-playing'); // Hide cursor
+    document.body.classList.add('game-playing');
     document.getElementById('startScreen').classList.add('hidden');
     this.currentGameState = 'playing';
     this.gameState.reset();
@@ -80,7 +82,7 @@ class PolygonHandCannon {
   }
 
   restartGame() {
-    document.body.classList.remove('game-playing'); // Show cursor
+    document.body.classList.remove('game-playing');
     document.getElementById('gameOver').classList.remove('show');
     document.getElementById('startScreen').classList.remove('hidden');
     this.currentGameState = 'ready';
@@ -113,6 +115,9 @@ class PolygonHandCannon {
     if (handPos) {
       this.crosshair.style.left = `${handPos.x}px`;
       this.crosshair.style.top = `${handPos.y}px`;
+      // FIX: Update the hand indicator's position along with the crosshair
+      this.handIndicator.style.left = `${handPos.x}px`;
+      this.handIndicator.style.top = `${handPos.y}px`;
     }
     
     this.crosshair.classList.toggle('targeting', !!this.targetedShape);
@@ -184,7 +189,7 @@ class PolygonHandCannon {
   }
 
   gameOver() {
-    document.body.classList.remove('game-playing'); // Show cursor
+    document.body.classList.remove('game-playing');
     this.gameState.isGameOver = true;
     this.currentGameState = 'gameOver';
     document.getElementById('finalScore').textContent = this.gameState.score;
