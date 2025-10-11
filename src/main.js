@@ -14,13 +14,13 @@ class PolygonHandCannon {
     this.handTracker = null;
     this.particleSystem = null;
     this.soundManager = null;
-    this.music = document.getElementById('background-music'); // Get the audio element
+    this.music = document.getElementById('background-music');
     this.isInitialized = false;
     this.lastTime = performance.now();
     this.crosshair = document.getElementById('crosshair');
     this.currentGameState = 'initializing';
     this.canShoot = true;
-    this.canActivateMenu = true;
+    this.shootPressed = false;
     this.targetedShape = null;
   }
 
@@ -49,38 +49,55 @@ class PolygonHandCannon {
   setupEventListeners() {
     document.getElementById('startBtn').addEventListener('click', () => this.startGame());
     document.getElementById('restartBtn').addEventListener('click', () => this.restartGame());
+
+    const startShooting = (e) => { 
+        if(e.type !== 'keydown' || !e.repeat) {
+            this.shootPressed = true;
+        }
+    };
+    const stopShooting = () => { 
+        this.shootPressed = false; 
+    };
+
+    window.addEventListener('mousedown', startShooting);
+    window.addEventListener('mouseup', stopShooting);
+    window.addEventListener('touchstart', startShooting, { passive: false });
+    window.addEventListener('touchend', stopShooting);
+    window.addEventListener('keydown', startShooting);
+    window.addEventListener('keyup', stopShooting);
   }
 
   startGame() {
     if (this.currentGameState !== 'ready') return;
+    document.body.classList.add('game-playing'); // Hide cursor
     document.getElementById('startScreen').classList.add('hidden');
     this.currentGameState = 'playing';
     this.gameState.reset();
     this.shapeSpawner.reset();
     this.particleSystem.reset();
-    this.music.volume = 0.2; // Set a nice background volume
+    this.music.volume = 0.2;
     this.music.play();
   }
 
   restartGame() {
+    document.body.classList.remove('game-playing'); // Show cursor
     document.getElementById('gameOver').classList.remove('show');
     document.getElementById('startScreen').classList.remove('hidden');
     this.currentGameState = 'ready';
     this.music.pause();
-    this.music.currentTime = 0; // Rewind to the start
+    this.music.currentTime = 0;
   }
 
   gameLoop() {
     const currentTime = performance.now();
     const deltaTime = (currentTime - this.lastTime) / 1000;
     this.lastTime = currentTime;
+    
     const handPos = this.handTracker.getPointerPosition();
-    const isShooting = this.handTracker.getIsShooting();
-
-    this.updateUI(handPos, isShooting);
+    this.updateUI(handPos);
 
     if (this.currentGameState === 'playing' && !this.gameState.isGameOver) {
-      this.updateGame(deltaTime, handPos, isShooting);
+      this.updateGame(deltaTime, handPos);
     }
     
     this.renderer.render({
@@ -92,27 +109,11 @@ class PolygonHandCannon {
     requestAnimationFrame(() => this.gameLoop());
   }
 
-  updateUI(handPos, isShooting) {
+  updateUI(handPos) {
     if (handPos) {
       this.crosshair.style.left = `${handPos.x}px`;
       this.crosshair.style.top = `${handPos.y}px`;
     }
-
-    const handleMenuInteraction = (buttonId, action) => {
-        const button = document.getElementById(buttonId);
-        const rect = button.getBoundingClientRect();
-        const hovering = handPos && (handPos.x > rect.left && handPos.x < rect.right && handPos.y > rect.top && handPos.y < rect.bottom);
-        button.classList.toggle('targeted', hovering);
-        if (hovering && isShooting && this.canActivateMenu) {
-            action();
-            this.canActivateMenu = false;
-        }
-    };
-
-    if (this.currentGameState === 'ready') handleMenuInteraction('startBtn', () => this.startGame());
-    else if (this.currentGameState === 'gameOver') handleMenuInteraction('restartBtn', () => this.restartGame());
-    
-    if (!isShooting) this.canActivateMenu = true;
     
     this.crosshair.classList.toggle('targeting', !!this.targetedShape);
     document.getElementById('score').textContent = this.gameState.score;
@@ -120,14 +121,14 @@ class PolygonHandCannon {
     document.getElementById('shapeCount').textContent = this.shapeSpawner.getShapes().length;
   }
   
-  updateGame(deltaTime, handPos, isShooting) {
+  updateGame(deltaTime, handPos) {
     this.shapeSpawner.update(deltaTime, this.gameState.wave);
     this.particleSystem.update(deltaTime);
 
     const shapes = this.shapeSpawner.getShapes();
     this.targetedShape = this.performRaycast(handPos, shapes);
 
-    if (isShooting && this.canShoot && this.targetedShape) {
+    if (this.shootPressed && this.canShoot && this.targetedShape) {
       this.destroyShape(this.targetedShape);
       this.gameState.addScore(100);
       this.soundManager.playShootSound();
@@ -135,7 +136,9 @@ class PolygonHandCannon {
       this.targetedShape = null;
     }
     
-    if (!isShooting) this.canShoot = true;
+    if (!this.shootPressed) {
+      this.canShoot = true;
+    }
 
     for (const shape of shapes) {
         if (shape.toBeRemoved) continue;
@@ -161,17 +164,15 @@ class PolygonHandCannon {
   performRaycast(handPos, shapes) {
     if (!handPos) return null;
 
-    const HITBOX_RADIUS = 40; // Max distance in pixels to register a hit.
+    const HITBOX_RADIUS = 40;
     let closestShape = null;
-    let closestDistance = HITBOX_RADIUS; // Start with the max allowed distance.
+    let closestDistance = HITBOX_RADIUS;
 
     for (const shape of shapes) {
       if (shape.toBeRemoved) continue;
       const projected = this.renderer.projectToScreen(shape.position);
       if (projected) {
         const distance = Math.hypot(projected.x - handPos.x, projected.y - handPos.y);
-
-        // Check if the shape is within the hitbox AND closer than any other valid target.
         if (distance < closestDistance) {
           closestDistance = distance;
           closestShape = shape;
@@ -179,16 +180,17 @@ class PolygonHandCannon {
       }
     }
     
-    return closestShape; // This will be null if no shape is within the HITBOX_RADIUS.
+    return closestShape;
   }
 
   gameOver() {
+    document.body.classList.remove('game-playing'); // Show cursor
     this.gameState.isGameOver = true;
     this.currentGameState = 'gameOver';
     document.getElementById('finalScore').textContent = this.gameState.score;
     document.getElementById('gameOver').classList.add('show');
     this.music.pause();
-    this.music.currentTime = 0; // Rewind to the start
+    this.music.currentTime = 0;
   }
 }
 

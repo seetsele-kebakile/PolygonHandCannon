@@ -1,6 +1,3 @@
-// src/input/hand-tracker.js
-
-// Hand tracking using MediaPipe Hands
 import { Hands } from '@mediapipe/hands';
 import { Camera } from '@mediapipe/camera_utils';
 
@@ -14,18 +11,15 @@ export class HandTracker {
     this.smoothedHandPos = { x: window.innerWidth / 2, y: window.innerHeight / 2 };
     this.smoothing = 0.3;
     this.handDetected = false;
-    this.isShooting = false;
   }
 
   async init() {
-    // Create hidden video element
     this.video = document.createElement('video');
     this.video.style.display = 'none';
     this.video.width = 640;
     this.video.height = 480;
     document.body.appendChild(this.video);
 
-    // Initialize MediaPipe Hands
     this.hands = new Hands({
       locateFile: (file) => {
         return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
@@ -57,27 +51,6 @@ export class HandTracker {
     this.isRunning = true;
   }
 
-  // Updated helper function
-  isShootingGesture(landmarks) {
-    const indexTip = landmarks[8];
-    const middleTip = landmarks[12];
-    const ringTip = landmarks[16];
-    const pinkyTip = landmarks[20];
-
-    const indexMcp = landmarks[5]; // Knuckle at the base of the index finger
-
-    // Rule 1: Index finger is extended
-    const isIndexExtended = indexTip.y < indexMcp.y;
-
-    // Rule 2: Other three fingers are curled
-    const areOthersCurled = middleTip.y > landmarks[9].y &&
-                             ringTip.y > landmarks[13].y &&
-                             pinkyTip.y > landmarks[17].y;
-
-    // The thumb check has been removed for reliability
-    return isIndexExtended && areOthersCurled;
-  }
-
   onResults(results) {
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
       this.handDetected = true;
@@ -95,12 +68,9 @@ export class HandTracker {
       this.smoothedHandPos.y = this.smoothedHandPos.y * (1 - this.smoothing) + 
                                this.currentHandPos.y * this.smoothing;
       
-      this.isShooting = this.isShootingGesture(landmarks);
-
     } else {
       this.handDetected = false;
       this.currentHandPos = null;
-      this.isShooting = false;
     }
   }
 
@@ -112,10 +82,6 @@ export class HandTracker {
     return this.handDetected;
   }
   
-  getIsShooting() {
-    return this.isShooting;
-  }
-
   stop() {
     if (!this.isRunning) return;
     
