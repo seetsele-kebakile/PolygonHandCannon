@@ -14,6 +14,7 @@ class PolygonHandCannon {
     this.handTracker = null;
     this.particleSystem = null;
     this.soundManager = null;
+    this.music = document.getElementById('background-music'); // Get the audio element
     this.isInitialized = false;
     this.lastTime = performance.now();
     this.crosshair = document.getElementById('crosshair');
@@ -57,12 +58,16 @@ class PolygonHandCannon {
     this.gameState.reset();
     this.shapeSpawner.reset();
     this.particleSystem.reset();
+    this.music.volume = 0.2; // Set a nice background volume
+    this.music.play();
   }
 
   restartGame() {
     document.getElementById('gameOver').classList.remove('show');
     document.getElementById('startScreen').classList.remove('hidden');
     this.currentGameState = 'ready';
+    this.music.pause();
+    this.music.currentTime = 0; // Rewind to the start
   }
 
   gameLoop() {
@@ -132,17 +137,14 @@ class PolygonHandCannon {
     
     if (!isShooting) this.canShoot = true;
 
-    // Update shape positions and check for game over
     for (const shape of shapes) {
         if (shape.toBeRemoved) continue;
         shape.position[2] += shape.velocity * deltaTime;
         shape.rotationX += deltaTime * 0.5;
         shape.rotationY += deltaTime * 0.3;
         
-        // Threat calculation for the new coordinate space (z=-10 to z=4.5)
         shape.threat = Math.max(0, Math.min(1, (shape.position[2] + 10) / 14.5));
         
-        // Game over check, now much closer to the camera
         if (shape.position[2] > 4.5) {
             this.gameOver();
             break;
@@ -179,6 +181,8 @@ class PolygonHandCannon {
     this.currentGameState = 'gameOver';
     document.getElementById('finalScore').textContent = this.gameState.score;
     document.getElementById('gameOver').classList.add('show');
+    this.music.pause();
+    this.music.currentTime = 0; // Rewind to the start
   }
 }
 
